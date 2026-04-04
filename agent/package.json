@@ -1,0 +1,23 @@
+{
+  "name": "liquidmind-agent",
+  "version": "0.1.0",
+  "description": "LiquidMind autonomous liquidation agent",
+  "type": "module",
+  "main": "src/index.ts",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@stellar/stellar-sdk": "^14.0.0",
+    "@x402/core": "^2.9.0",
+    "snarkjs": "^0.7.4",
+    "x402-flash-stellar-sdk": "^0.1.6"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  }
+}

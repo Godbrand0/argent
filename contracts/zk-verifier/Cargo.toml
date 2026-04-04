@@ -1,0 +1,18 @@
+[package]
+name = "zk-verifier"
+description = "LiquidMind ZK verifier: thin Groth16 wrapper over Soroban BN254 host functions"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+version.workspace = true
+
+[lib]
+crate-type = ["cdylib"]
+doctest = false
+
+[dependencies]
+soroban-sdk = { workspace = true }
+
+[dev-dependencies]
+soroban-sdk = { workspace = true, features = ["testutils"] }
