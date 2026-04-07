@@ -1,4 +1,5 @@
 "use client"
+import Link from "next/link"
 import { useState } from "react"
 import { StatCard } from "./StatCard"
 import { usePoolStats } from "@/hooks/useVault"
@@ -54,6 +55,24 @@ export function VaultDashboard() {
 					<BorrowPanel publicKey={publicKey} sign={sign} />
 				</div>
 			)}
+
+			{/* Agent access callout */}
+			<div className="rounded-xl border border-gray-800 bg-gray-900/50 p-5 flex items-center justify-between gap-4">
+				<div>
+					<p className="text-sm font-medium text-gray-300">
+						Programmatic Access
+					</p>
+					<p className="text-xs text-gray-500 mt-0.5">
+						Automate liquidations and auction bidding with an autonomous agent.
+					</p>
+				</div>
+				<Link
+					href="/agent"
+					className="shrink-0 px-4 py-1.5 text-xs font-medium rounded-md bg-gray-800 text-gray-300 hover:text-white hover:bg-gray-700 transition-colors"
+				>
+					Agent Access →
+				</Link>
+			</div>
 		</div>
 	)
 }

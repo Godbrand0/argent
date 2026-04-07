@@ -12,6 +12,9 @@ export interface Position {
 	debtPrincipal: bigint
 	borrowIndexAtOpen: bigint
 	openedAtLedger: number
+	/** Ledger at which this loan matures (0 = no term set) */
+	dueAtLedger: number
+	loanTermLedgers: number
 	auctionState: AuctionState
 	becameLiquidatableAt: number
 }
@@ -25,6 +28,20 @@ export interface Auction {
 	startedAtLedger: number
 	triggerAgent: string
 	settled: boolean
+}
+
+export interface PoolAgent {
+	owner: string
+	joinedAtLedger: number
+	auctionsWon: bigint
+	collateralEarnedUsdc: bigint
+}
+
+export interface LimitBid {
+	agent: string
+	maxPrice: bigint
+	placedAtLedger: number
+	active: boolean
 }
 
 // ---------------------------------------------------------------------------
@@ -44,6 +61,7 @@ export interface ZkProofSet {
 export interface AgentState {
 	positions: Position[]
 	activeAuctions: Auction[]
+	/** Positions unsafe due to low HF or maturity expiry */
 	atRiskPositions: Position[]
 	biddableAuctions: Auction[]
 	priceCache: PriceCache
@@ -56,6 +74,8 @@ export interface AgentState {
 	lastScan: number
 	ledgerSinceHeartbeat: number
 	currentLedger: number
+	/** IDs of auctions this agent has already placed a limit bid on */
+	placedBidAuctionIds: Set<string>
 }
 
 // ---------------------------------------------------------------------------

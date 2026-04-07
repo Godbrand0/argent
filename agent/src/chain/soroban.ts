@@ -10,7 +10,9 @@ import {
 } from "@stellar/stellar-sdk"
 import { CONFIG } from "../config.js"
 
-const server = new rpc.Server(CONFIG.network.rpcUrl, { allowHttp: false })
+export const server = new rpc.Server(CONFIG.network.rpcUrl, {
+	allowHttp: false,
+})
 
 export async function invokeContract(
 	contractId: string,

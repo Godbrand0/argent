@@ -10,14 +10,44 @@ export const CONFIG = {
 	contracts: {
 		vault: process.env.VAULT_CONTRACT_ID ?? "",
 		vusdc: process.env.VUSDC_CONTRACT_ID ?? "",
-		usdc: process.env.USDC_CONTRACT_ID ?? "",
+		// Native XLM Stellar Asset Contract — used as collateral
+		xlmSac:
+			process.env.XLM_SAC_CONTRACT_ID ??
+			"CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC",
+		// USDC SAC — Circle testnet issuer
+		usdc:
+			process.env.USDC_CONTRACT_ID ??
+			"CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA",
 	},
 	agent: {
 		secretKey: process.env.AGENT_SECRET_KEY ?? "",
+		/**
+		 * The Stellar address of the human/entity that owns this agent.
+		 * Collateral won at auction is held by the agent keypair, but the owner
+		 * is recorded on-chain in the pool registry for attribution.
+		 */
+		ownerAddress: process.env.AGENT_OWNER_ADDRESS ?? "",
+		/**
+		 * "monitor"  — only scans positions and triggers auctions (earns trigger fees)
+		 * "bidder"   — only watches auctions and places limit bids (earns collateral)
+		 * "both"     — does both (default for single-agent setups)
+		 */
+		role: (process.env.AGENT_ROLE ?? "both") as "monitor" | "bidder" | "both",
 		loopIntervalMs: parseInt(process.env.LOOP_INTERVAL_MS ?? "5000"),
 		heartbeatIntervalLedgers: parseInt(process.env.HEARTBEAT_INTERVAL ?? "60"),
 		scanIntervalMs: parseInt(process.env.SCAN_INTERVAL_MS ?? "10000"),
+		/**
+		 * Minimum discount (as a fraction) before this agent places a limit bid.
+		 * e.g. 0.05 = only bid when current Dutch price is ≥5% below market value.
+		 * Lower values = more aggressive (bid earlier, less profit per auction).
+		 * Higher values = more conservative (wait longer, more profit if you win).
+		 */
 		minProfitThreshold: parseFloat(process.env.MIN_PROFIT_THRESHOLD ?? "0.02"),
+		/**
+		 * Maximum USDC to spend on a single bid. 0 = no limit (use full balance).
+		 * Useful when running pool agents with capped budgets.
+		 */
+		maxBidUsdc: parseInt(process.env.MAX_BID_USDC ?? "0"),
 	},
 	zk: {
 		hfWasmPath:

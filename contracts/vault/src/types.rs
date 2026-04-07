@@ -1,4 +1,4 @@
-use soroban_sdk::{contracttype, Address, Symbol};
+use soroban_sdk::{contracttype, Address, Symbol, Vec};
 
 // ---------------------------------------------------------------------------
 // Storage keys
@@ -33,6 +33,9 @@ pub enum DataKey {
     ApVk,
     // Temporary storage (5-ledger TTL)
     AgentHeartbeat,
+    // Agent pool registry
+    PoolAgent(Address),       // PoolAgent struct per registered agent
+    AuctionBids(u64),         // Vec<LimitBid> per auction
 }
 
 // ---------------------------------------------------------------------------
@@ -61,6 +64,10 @@ pub struct Position {
     /// Borrow index snapshot at open (scaled 1e7)
     pub borrow_index_at_open: i128,
     pub opened_at_ledger: u32,
+    /// Ledger at which this loan matures (0 = no term set)
+    pub due_at_ledger: u32,
+    /// Original loan term in ledgers chosen by the borrower
+    pub loan_term_ledgers: u32,
     pub auction_state: AuctionState,
     /// Ledger when this position first became liquidatable (0 = not yet)
     pub became_liquidatable_at: u32,
@@ -84,6 +91,8 @@ pub struct Auction {
 #[derive(Clone, Debug)]
 #[contracttype]
 pub struct CollateralConfig {
+    /// Token contract address for this collateral asset
+    pub token_address: Address,
     /// Max LTV ratio (scaled 1e7 — e.g. 6_500_000 = 65%)
     pub max_ltv: i128,
     /// Liquidation threshold (scaled 1e7 — e.g. 8_000_000 = 80%)
@@ -94,4 +103,36 @@ pub struct CollateralConfig {
     pub floor_ratio: i128,
     /// Max auction duration in ledgers
     pub max_auction_ledgers: u32,
+}
+
+// ---------------------------------------------------------------------------
+// Agent pool structs
+// ---------------------------------------------------------------------------
+
+/// Registered pool participant. Stored per agent address.
+#[derive(Clone, Debug)]
+#[contracttype]
+pub struct PoolAgent {
+    /// The human/entity that owns and benefits from this agent.
+    pub owner: Address,
+    pub joined_at_ledger: u32,
+    pub auctions_won: u64,
+    /// Total USDC value of collateral acquired (7 decimal places)
+    pub collateral_earned_usdc: i128,
+}
+
+/// A limit bid placed by a registered agent on a specific auction.
+/// Multiple agents can have bids on the same auction.
+#[derive(Clone, Debug)]
+#[contracttype]
+pub struct LimitBid {
+    /// The registered agent placing this bid.
+    pub agent: Address,
+    /// Maximum USDC the agent is willing to pay (7 decimal places).
+    /// Actual settlement price = Dutch auction price at time of settle,
+    /// which is always <= max_price.
+    pub max_price: i128,
+    pub placed_at_ledger: u32,
+    /// False once cancelled or after auction settles.
+    pub active: bool,
 }

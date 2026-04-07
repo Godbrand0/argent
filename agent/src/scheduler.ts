@@ -6,9 +6,15 @@ import { getCurrentLedger } from "./chain/soroban.js"
 import { CONFIG } from "./config.js"
 import { type Action, type AgentState } from "./types.js"
 
-export async function runScheduler(keypair: Keypair): Promise<never> {
-	const monitorActions = buildMonitorActions(keypair)
-	const bidderActions = buildBidderActions(keypair)
+export type AgentRole = "monitor" | "bidder" | "both"
+
+export async function runScheduler(
+	keypair: Keypair,
+	role: AgentRole = "both",
+): Promise<never> {
+	const monitorActions = role !== "bidder" ? buildMonitorActions(keypair) : []
+	const bidderActions = role !== "monitor" ? buildBidderActions(keypair) : []
+
 	const allActions: Action[] = [...monitorActions, ...bidderActions].sort(
 		(a, b) => b.priority - a.priority,
 	)
@@ -28,20 +34,22 @@ export async function runScheduler(keypair: Keypair): Promise<never> {
 		lastScan: 0,
 		ledgerSinceHeartbeat: 999,
 		currentLedger: 0,
+		placedBidAuctionIds: new Set(),
 	}
 
-	console.log("LiquidMind agent starting...")
+	console.log(
+		`LiquidMind agent running (role: ${role}, ` +
+			`${allActions.length} actions loaded)`,
+	)
 
 	while (true) {
 		try {
-			// Observe world
 			state.currentLedger = await getCurrentLedger()
 			state.agentUsdcBalance = await getAccountBalance(
 				keypair.publicKey(),
 				"USDC",
 			)
 
-			// Find highest-priority eligible action
 			const eligible = allActions.filter((a) => {
 				try {
 					return a.preconditions(state)

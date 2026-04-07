@@ -12,7 +12,14 @@ export const NETWORK = {
 export const CONTRACTS = {
 	vault: process.env.NEXT_PUBLIC_VAULT_CONTRACT_ID ?? "",
 	vusdc: process.env.NEXT_PUBLIC_VUSDC_CONTRACT_ID ?? "",
-	usdc: process.env.NEXT_PUBLIC_USDC_CONTRACT_ID ?? "",
+	// Native XLM Stellar Asset Contract — deposited as collateral to borrow USDC
+	xlmSac:
+		process.env.NEXT_PUBLIC_XLM_SAC_CONTRACT_ID ??
+		"CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC",
+	// USDC SAC — Circle testnet (issuer: GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5)
+	usdc:
+		process.env.NEXT_PUBLIC_USDC_CONTRACT_ID ??
+		"CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA",
 }
 
 export const SCALE = 10_000_000n

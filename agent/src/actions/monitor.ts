@@ -88,13 +88,24 @@ export function buildMonitorActions(keypair: Keypair): Action[] {
 					SBTC: 8_500_000n, // 85%
 				}
 				s.atRiskPositions = s.positions.filter((pos) => {
+					if (pos.debtPrincipal === 0n) return false
+
+					// Trigger 1: loan term expired without repayment
+					if (pos.dueAtLedger > 0 && s.currentLedger >= pos.dueAtLedger) {
+						console.log(
+							`[health_factor] position ${pos.id} MATURED ` +
+								`(due=${pos.dueAtLedger}, now=${s.currentLedger})`,
+						)
+						return true
+					}
+
+					// Trigger 2: health factor below liquidation threshold
 					const price = BigInt(
 						Math.round(
 							(s.priceCache.prices[pos.collateralAsset] ?? 0) * 10_000_000,
 						),
 					)
 					const threshold = LIQ_THRESHOLD[pos.collateralAsset] ?? SCALE
-					if (pos.debtPrincipal === 0n) return false
 					const colVal = (pos.collateralAmount * price) / SCALE
 					const hf = (colVal * threshold) / pos.debtPrincipal
 					if (hf < SCALE) {
@@ -105,7 +116,7 @@ export function buildMonitorActions(keypair: Keypair): Action[] {
 					}
 					return false
 				})
-				s.zkProofsReady = false // invalidate proofs when positions refresh
+				s.zkProofsReady = false
 			},
 		},
 		{
@@ -161,6 +172,8 @@ export function buildMonitorActions(keypair: Keypair): Action[] {
 							debtPrincipal: native.debt_principal,
 							borrowIndexAtOpen: native.borrow_index_at_open,
 							openedAtLedger: native.opened_at_ledger,
+							dueAtLedger: native.due_at_ledger ?? 0,
+							loanTermLedgers: native.loan_term_ledgers ?? 0,
 							auctionState: native.auction_state,
 							becameLiquidatableAt: native.became_liquidatable_at,
 						})

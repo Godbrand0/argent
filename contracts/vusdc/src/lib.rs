@@ -21,6 +21,12 @@ pub enum DataKey {
     Allowance(Address, Address),
 }
 
+// ---------------------------------------------------------------------------
+// TTL constants (in ledgers, ~5s each)
+// ---------------------------------------------------------------------------
+
+/// 30 days — for balance and allowance entries
+const PERSISTENT_TTL: u32 = 518_400;
 
 // ---------------------------------------------------------------------------
 // Contract
@@ -48,14 +54,12 @@ impl VUsdcContract {
     // SEP-41 token interface
     // -----------------------------------------------------------------------
 
-    pub fn name(_env: Env) -> String {
-        // SEP-41 requires returning token name
-        // Note: String::from_str requires env reference; hardcoded for now
-        panic!("call name() with env")
+    pub fn name(env: Env) -> String {
+        String::from_str(&env, "Vault USDC")
     }
 
-    pub fn symbol(_env: Env) -> String {
-        panic!("call symbol() with env")
+    pub fn symbol(env: Env) -> String {
+        String::from_str(&env, "vUSDC")
     }
 
     pub fn decimals(_env: Env) -> u32 {
@@ -67,10 +71,12 @@ impl VUsdcContract {
     }
 
     pub fn balance(env: Env, account: Address) -> i128 {
-        env.storage()
-            .persistent()
-            .get(&DataKey::Balance(account))
-            .unwrap_or(0)
+        let key = DataKey::Balance(account);
+        let bal: i128 = env.storage().persistent().get(&key).unwrap_or(0);
+        if bal > 0 {
+            env.storage().persistent().extend_ttl(&key, PERSISTENT_TTL, PERSISTENT_TTL);
+        }
+        bal
     }
 
     pub fn transfer(env: Env, from: Address, to: Address, amount: i128) {
@@ -81,20 +87,20 @@ impl VUsdcContract {
 
     pub fn transfer_from(env: Env, spender: Address, from: Address, to: Address, amount: i128) {
         spender.require_auth();
-        let allowance = Self::allowance(env.clone(), from.clone(), spender.clone());
+        let allowance_key = DataKey::Allowance(from.clone(), spender.clone());
+        let allowance: i128 = env.storage().persistent().get(&allowance_key).unwrap_or(0);
         assert!(allowance >= amount, "insufficient allowance");
         let new_allowance = allowance - amount;
-        env.storage()
-            .persistent()
-            .set(&DataKey::Allowance(from.clone(), spender), &new_allowance);
+        env.storage().persistent().set(&allowance_key, &new_allowance);
+        env.storage().persistent().extend_ttl(&allowance_key, PERSISTENT_TTL, PERSISTENT_TTL);
         Self::_transfer(&env, &from, &to, amount);
     }
 
     pub fn approve(env: Env, from: Address, spender: Address, amount: i128, _expiration_ledger: u32) {
         from.require_auth();
-        env.storage()
-            .persistent()
-            .set(&DataKey::Allowance(from.clone(), spender.clone()), &amount);
+        let key = DataKey::Allowance(from.clone(), spender.clone());
+        env.storage().persistent().set(&key, &amount);
+        env.storage().persistent().extend_ttl(&key, PERSISTENT_TTL, PERSISTENT_TTL);
         env.events().publish(
             (Symbol::new(&env, "approve"),),
             (from, spender, amount),
@@ -102,10 +108,12 @@ impl VUsdcContract {
     }
 
     pub fn allowance(env: Env, from: Address, spender: Address) -> i128 {
-        env.storage()
-            .persistent()
-            .get(&DataKey::Allowance(from, spender))
-            .unwrap_or(0)
+        let key = DataKey::Allowance(from, spender);
+        let val: i128 = env.storage().persistent().get(&key).unwrap_or(0);
+        if val > 0 {
+            env.storage().persistent().extend_ttl(&key, PERSISTENT_TTL, PERSISTENT_TTL);
+        }
+        val
     }
 
     // -----------------------------------------------------------------------
@@ -118,14 +126,10 @@ impl VUsdcContract {
         vault.require_auth();
         assert!(amount > 0, "amount must be positive");
 
-        let bal: i128 = env
-            .storage()
-            .persistent()
-            .get(&DataKey::Balance(to.clone()))
-            .unwrap_or(0);
-        env.storage()
-            .persistent()
-            .set(&DataKey::Balance(to.clone()), &(bal + amount));
+        let key = DataKey::Balance(to.clone());
+        let bal: i128 = env.storage().persistent().get(&key).unwrap_or(0);
+        env.storage().persistent().set(&key, &(bal + amount));
+        env.storage().persistent().extend_ttl(&key, PERSISTENT_TTL, PERSISTENT_TTL);
 
         let supply: i128 = env.storage().instance().get(&DataKey::TotalSupply).unwrap_or(0);
         env.storage().instance().set(&DataKey::TotalSupply, &(supply + amount));
@@ -139,20 +143,14 @@ impl VUsdcContract {
         vault.require_auth();
         assert!(amount > 0, "amount must be positive");
 
-        let bal: i128 = env
-            .storage()
-            .persistent()
-            .get(&DataKey::Balance(from.clone()))
-            .unwrap_or(0);
+        let key = DataKey::Balance(from.clone());
+        let bal: i128 = env.storage().persistent().get(&key).unwrap_or(0);
         assert!(bal >= amount, "insufficient balance");
-        env.storage()
-            .persistent()
-            .set(&DataKey::Balance(from.clone()), &(bal - amount));
+        env.storage().persistent().set(&key, &(bal - amount));
+        env.storage().persistent().extend_ttl(&key, PERSISTENT_TTL, PERSISTENT_TTL);
 
         let supply: i128 = env.storage().instance().get(&DataKey::TotalSupply).unwrap_or(0);
-        env.storage()
-            .instance()
-            .set(&DataKey::TotalSupply, &(supply - amount));
+        env.storage().instance().set(&DataKey::TotalSupply, &(supply - amount));
 
         env.events().publish((Symbol::new(&env, "burn"),), (from, amount));
     }
@@ -162,25 +160,18 @@ impl VUsdcContract {
     // -----------------------------------------------------------------------
 
     fn _transfer(env: &Env, from: &Address, to: &Address, amount: i128) {
-        let from_bal: i128 = env
-            .storage()
-            .persistent()
-            .get(&DataKey::Balance(from.clone()))
-            .unwrap_or(0);
+        let from_key = DataKey::Balance(from.clone());
+        let from_bal: i128 = env.storage().persistent().get(&from_key).unwrap_or(0);
         assert!(from_bal >= amount, "insufficient balance");
 
-        let to_bal: i128 = env
-            .storage()
-            .persistent()
-            .get(&DataKey::Balance(to.clone()))
-            .unwrap_or(0);
+        let to_key = DataKey::Balance(to.clone());
+        let to_bal: i128 = env.storage().persistent().get(&to_key).unwrap_or(0);
 
-        env.storage()
-            .persistent()
-            .set(&DataKey::Balance(from.clone()), &(from_bal - amount));
-        env.storage()
-            .persistent()
-            .set(&DataKey::Balance(to.clone()), &(to_bal + amount));
+        env.storage().persistent().set(&from_key, &(from_bal - amount));
+        env.storage().persistent().extend_ttl(&from_key, PERSISTENT_TTL, PERSISTENT_TTL);
+
+        env.storage().persistent().set(&to_key, &(to_bal + amount));
+        env.storage().persistent().extend_ttl(&to_key, PERSISTENT_TTL, PERSISTENT_TTL);
 
         env.events().publish(
             (Symbol::new(env, "transfer"),),

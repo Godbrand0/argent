@@ -1,6 +1,6 @@
-use soroban_sdk::{Address, Env, Symbol};
+use soroban_sdk::{Address, Env, Symbol, Vec};
 
-use crate::types::{Auction, CollateralConfig, DataKey, Position};
+use crate::types::{Auction, CollateralConfig, DataKey, LimitBid, PoolAgent, Position};
 
 // ---------------------------------------------------------------------------
 // TTL constants (in ledgers, ~5s each)
@@ -198,4 +198,52 @@ pub fn set_heartbeat(env: &Env, ledger: u32) {
 
 pub fn get_heartbeat(env: &Env) -> u32 {
     env.storage().temporary().get(&DataKey::AgentHeartbeat).unwrap_or(0)
+}
+
+// ---------------------------------------------------------------------------
+// Persistent helpers — agent pool registry
+// ---------------------------------------------------------------------------
+
+pub fn get_pool_agent(env: &Env, agent: &Address) -> Option<PoolAgent> {
+    let key = DataKey::PoolAgent(agent.clone());
+    let entry = env.storage().persistent().get(&key);
+    if entry.is_some() {
+        env.storage().persistent().extend_ttl(&key, PERSISTENT_TTL, PERSISTENT_TTL);
+    }
+    entry
+}
+
+pub fn set_pool_agent(env: &Env, agent: &Address, entry: &PoolAgent) {
+    let key = DataKey::PoolAgent(agent.clone());
+    env.storage().persistent().set(&key, entry);
+    env.storage().persistent().extend_ttl(&key, PERSISTENT_TTL, PERSISTENT_TTL);
+}
+
+pub fn remove_pool_agent(env: &Env, agent: &Address) {
+    env.storage().persistent().remove(&DataKey::PoolAgent(agent.clone()));
+}
+
+pub fn is_registered_agent(env: &Env, agent: &Address) -> bool {
+    env.storage().persistent().has(&DataKey::PoolAgent(agent.clone()))
+}
+
+// ---------------------------------------------------------------------------
+// Persistent helpers — limit bids per auction
+// ---------------------------------------------------------------------------
+
+pub fn get_auction_bids(env: &Env, auction_id: u64) -> Vec<LimitBid> {
+    let key = DataKey::AuctionBids(auction_id);
+    let bids: Option<Vec<LimitBid>> = env.storage().persistent().get(&key);
+    if let Some(ref b) = bids {
+        if !b.is_empty() {
+            env.storage().persistent().extend_ttl(&key, PERSISTENT_TTL, PERSISTENT_TTL);
+        }
+    }
+    bids.unwrap_or_else(|| Vec::new(env))
+}
+
+pub fn set_auction_bids(env: &Env, auction_id: u64, bids: &Vec<LimitBid>) {
+    let key = DataKey::AuctionBids(auction_id);
+    env.storage().persistent().set(&key, bids);
+    env.storage().persistent().extend_ttl(&key, PERSISTENT_TTL, PERSISTENT_TTL);
 }

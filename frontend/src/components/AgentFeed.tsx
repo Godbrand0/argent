@@ -1,143 +1,268 @@
 "use client"
-import { StatCard } from "./StatCard"
-import { useAgent, type AgentEvent } from "@/hooks/useAgent"
-import { usePoolStats } from "@/hooks/useVault"
+import { CONTRACTS, NETWORK } from "@/lib/config"
 
-const EVENT_ICONS: Record<AgentEvent["type"], string> = {
-	auction_started: "⚡",
-	auction_settled: "✅",
-	heartbeat: "💓",
-	bid: "🏷️",
-	other: "•",
-}
+const ENV_VARS = [
+	{
+		key: "AGENT_SECRET_KEY",
+		required: true,
+		desc: "The secret key (S…) of your agent's Stellar keypair. Think of this as the agent's wallet — it signs every transaction the agent submits, pays XLM gas fees, and is the address that receives the 1% liquidation trigger fee and any collateral won at auction. Generate a fresh keypair for the agent (do not reuse your personal wallet). Fund it with a small amount of XLM on testnet using Friendbot.",
+		link: {
+			label: "Generate a keypair on Stellar Lab",
+			href: "https://laboratory.stellar.org/account/create?network=testnet",
+		},
+	},
+	{
+		key: "AGENT_OWNER_ADDRESS",
+		required: true,
+		desc: "Your personal Stellar public key (G…) — the human behind the agent. This is recorded on-chain so rewards and attribution are tied to your identity, not just the agent keypair.",
+	},
+	{
+		key: "AGENT_ROLE",
+		required: false,
+		default: "both",
+		desc: '"monitor" — scans positions and triggers liquidations (earns trigger fees). "bidder" — bids on auctions (earns discounted collateral). "both" — does everything.',
+	},
+	{
+		key: "VAULT_CONTRACT_ID",
+		required: true,
+		desc: "The vault Soroban contract address. Copy it from the Pool Address box above.",
+	},
+	{
+		key: "VUSDC_CONTRACT_ID",
+		required: true,
+		desc: "The vUSDC token contract address. Returned by deploy.sh; also shown above.",
+	},
+	{
+		key: "MIN_PROFIT_THRESHOLD",
+		required: false,
+		default: "0.02",
+		desc: "Minimum discount fraction before the bidder places a bid. 0.02 = wait until the Dutch auction price is at least 2% below market value.",
+	},
+	{
+		key: "MAX_BID_USDC",
+		required: false,
+		default: "0 (unlimited)",
+		desc: "Maximum USDC to spend on a single auction bid. Useful for capping exposure.",
+	},
+	{
+		key: "STELLAR_RPC_URL",
+		required: false,
+		default: NETWORK.rpcUrl,
+		desc: "Soroban RPC endpoint.",
+	},
+]
 
-const EVENT_LABELS: Record<AgentEvent["type"], string> = {
-	auction_started: "Auction triggered",
-	auction_settled: "Auction settled",
-	heartbeat: "Heartbeat",
-	bid: "Bid submitted",
-	other: "Event",
-}
-
-const EVENT_COLORS: Record<AgentEvent["type"], string> = {
-	auction_started: "border-l-orange-400",
-	auction_settled: "border-l-green-400",
-	heartbeat: "border-l-indigo-400",
-	bid: "border-l-yellow-400",
-	other: "border-l-gray-600",
-}
-
-function EventRow({ event }: { event: AgentEvent }) {
+function CopyBox({ label, value }: { label: string; value: string }) {
 	return (
-		<div className={`border-l-2 pl-4 py-2 ${EVENT_COLORS[event.type]}`}>
+		<div className="space-y-1">
+			<p className="text-xs text-gray-400 uppercase tracking-wide">{label}</p>
 			<div className="flex items-center gap-2">
-				<span>{EVENT_ICONS[event.type]}</span>
-				<span className="text-sm font-medium text-gray-200">
-					{EVENT_LABELS[event.type]}
-				</span>
-				<span className="text-xs text-gray-500 ml-auto">
-					ledger {event.ledger}
-				</span>
+				<code className="flex-1 text-xs bg-gray-950 border border-gray-700 rounded-lg px-3 py-2 text-indigo-300 font-mono truncate">
+					{value || (
+						<span className="text-gray-600 italic">not deployed yet</span>
+					)}
+				</code>
 			</div>
-			<p className="text-xs text-gray-500 mt-0.5 font-mono truncate">
-				{JSON.stringify(event.data)}
-			</p>
 		</div>
 	)
 }
 
 export function AgentFeed() {
-	const { online, lastHeartbeatLedger, currentLedger, events } = useAgent()
-	const { stats } = usePoolStats()
-
-	const staleLedgers = currentLedger - lastHeartbeatLedger
+	const vaultId = CONTRACTS.vault
+	const vusdcId = CONTRACTS.vusdc
+	const rpcUrl = NETWORK.rpcUrl
 
 	return (
-		<div className="space-y-6">
+		<div className="space-y-8 max-w-3xl">
 			<div>
-				<h1 className="text-2xl font-bold text-white">Agent</h1>
+				<h1 className="text-2xl font-bold text-white">Agent Access</h1>
 				<p className="text-sm text-gray-400 mt-1">
-					LiquidMind autonomous agent — scans positions, generates ZK proofs,
-					triggers liquidations.
+					LiquidMind is managed by autonomous agents — they scan positions,
+					generate ZK health-factor proofs, trigger liquidations, and bid on
+					Dutch auctions. This page has everything you need to point an agent at
+					this pool.
 				</p>
 			</div>
 
-			{/* Status */}
-			<div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-				<div
-					className={`rounded-xl border p-5 ${
-						online === true
-							? "border-green-500/40 bg-green-950/20"
-							: online === false
-								? "border-red-500/40 bg-red-950/20"
-								: "border-gray-800 bg-gray-900"
-					}`}
-				>
-					<p className="text-xs text-gray-400 uppercase tracking-wide mb-1">
-						Agent Status
-					</p>
-					<div className="flex items-center gap-2">
-						<div
-							className={`w-2 h-2 rounded-full ${
-								online === true
-									? "bg-green-400 animate-pulse"
-									: online === false
-										? "bg-red-400"
-										: "bg-gray-600"
-							}`}
-						/>
-						<p className="text-lg font-semibold">
-							{online === null ? "—" : online ? "Online" : "Offline"}
+			{/* Pool addresses */}
+			<div className="rounded-xl border border-gray-800 bg-gray-900 p-6 space-y-4">
+				<h2 className="text-sm font-semibold text-white">Pool Addresses</h2>
+				<CopyBox label="Vault Contract ID" value={vaultId} />
+				<CopyBox label="vUSDC Contract ID" value={vusdcId} />
+				<CopyBox label="Soroban RPC" value={rpcUrl} />
+			</div>
+
+			{/* Agent roles */}
+			<div className="rounded-xl border border-gray-800 bg-gray-900 p-6 space-y-4">
+				<h2 className="text-sm font-semibold text-white">Agent Roles</h2>
+				<div className="grid sm:grid-cols-2 gap-4">
+					<div className="rounded-lg border border-gray-700 p-4 space-y-1">
+						<p className="text-sm font-medium text-indigo-300">monitor</p>
+						<p className="text-xs text-gray-400">
+							Polls positions and generates a ZK health-factor proof for each
+							one. Calls <code className="text-gray-300">trigger_auction</code>{" "}
+							when a position is undercollateralised. Earns a trigger fee paid
+							by the vault reserve.
+						</p>
+					</div>
+					<div className="rounded-lg border border-gray-700 p-4 space-y-1">
+						<p className="text-sm font-medium text-indigo-300">bidder</p>
+						<p className="text-xs text-gray-400">
+							Watches open auctions. Generates a ZK auction-price proof and
+							submits a limit bid when the Dutch-auction price reaches your
+							configured discount threshold. Earns discounted XLM collateral.
 						</p>
 					</div>
 				</div>
-				<StatCard
-					label="Last Heartbeat"
-					value={lastHeartbeatLedger ? `#${lastHeartbeatLedger}` : "—"}
-					sub={lastHeartbeatLedger ? `${staleLedgers} ledgers ago` : undefined}
-				/>
-				<StatCard
-					label="Current Ledger"
-					value={currentLedger ? `#${currentLedger}` : "—"}
-				/>
-				<StatCard
-					label="Open Positions"
-					value={stats ? stats.positionCount.toString() : "—"}
-					sub={stats ? `${stats.auctionCount} auctions` : undefined}
-				/>
 			</div>
 
-			{/* Event feed */}
-			<div className="rounded-xl border border-gray-800 bg-gray-900">
-				<div className="flex items-center justify-between px-5 py-3 border-b border-gray-800">
-					<h2 className="text-sm font-semibold text-white">Activity Feed</h2>
-					<span className="text-xs text-gray-500">
-						{events.length} recent events
-					</span>
-				</div>
-				<div className="divide-y divide-gray-800/50 px-5">
-					{events.length === 0 ? (
-						<p className="text-sm text-gray-500 py-8 text-center">
-							{online === null
-								? "Loading…"
-								: "No events yet. Start the agent to see activity."}
-						</p>
-					) : (
-						events.map((e) => <EventRow key={e.id} event={e} />)
-					)}
+			{/* Environment variables */}
+			<div className="rounded-xl border border-gray-800 bg-gray-900 p-6 space-y-4">
+				<h2 className="text-sm font-semibold text-white">
+					Environment Variables
+				</h2>
+				<div className="divide-y divide-gray-800">
+					{ENV_VARS.map((v) => (
+						<div key={v.key} className="py-3 space-y-0.5">
+							<div className="flex items-center gap-2">
+								<code className="text-xs text-indigo-300 font-mono">
+									{v.key}
+								</code>
+								{v.required ? (
+									<span className="text-xs text-red-400 font-medium">
+										required
+									</span>
+								) : (
+									<span className="text-xs text-gray-500">
+										optional — default:{" "}
+										<code className="text-gray-400">{v.default}</code>
+									</span>
+								)}
+							</div>
+							<p className="text-xs text-gray-500">{v.desc}</p>
+							{"link" in v && v.link && (
+								<a
+									href={v.link.href}
+									target="_blank"
+									rel="noopener noreferrer"
+									className="inline-flex items-center gap-1 text-xs text-indigo-400 hover:text-indigo-300 transition-colors mt-1"
+								>
+									{v.link.label} →
+								</a>
+							)}
+						</div>
+					))}
 				</div>
 			</div>
 
-			{/* Agent startup instructions */}
-			<div className="rounded-xl border border-gray-800 bg-gray-900 p-5 space-y-2">
+			{/* x402 Paid API */}
+			<div className="rounded-xl border border-indigo-900/40 bg-indigo-950/20 p-6 space-y-4">
+				<div>
+					<h2 className="text-sm font-semibold text-white">
+						Paid Data API (x402)
+					</h2>
+					<p className="text-xs text-gray-400 mt-1">
+						Vault state is available as a paid HTTP API. External agents pay
+						per-request in USDC using the{" "}
+						<a
+							href="https://developers.stellar.org/docs/build/agentic-payments/x402"
+							target="_blank"
+							rel="noopener noreferrer"
+							className="text-indigo-400 hover:text-indigo-300"
+						>
+							x402 protocol
+						</a>{" "}
+						— settled through the Built-on-Stellar facilitator. No API key
+						needed.
+					</p>
+				</div>
+
+				<div className="divide-y divide-gray-800/60">
+					{[
+						{
+							method: "GET",
+							path: "/pool",
+							price: "0.010",
+							desc: "TVL, utilization, borrow rate, reserve fund",
+						},
+						{
+							method: "GET",
+							path: "/opportunities",
+							price: "0.050",
+							desc: "Positions at risk of liquidation (health factor < 1.2)",
+						},
+						{
+							method: "GET",
+							path: "/auctions",
+							price: "0.050",
+							desc: "Active Dutch auctions with live price decay",
+						},
+					].map((ep) => (
+						<div key={ep.path} className="py-3 flex items-start gap-3">
+							<span className="shrink-0 text-xs font-mono text-green-400 bg-green-950/30 border border-green-900/40 rounded px-1.5 py-0.5">
+								{ep.method}
+							</span>
+							<div className="flex-1 min-w-0">
+								<div className="flex items-center gap-2 flex-wrap">
+									<code className="text-xs text-indigo-300 font-mono">
+										{ep.path}
+									</code>
+									<span className="text-xs text-yellow-400 font-medium">
+										{ep.price} USDC
+									</span>
+								</div>
+								<p className="text-xs text-gray-500 mt-0.5">{ep.desc}</p>
+							</div>
+						</div>
+					))}
+				</div>
+
+				<div className="space-y-2">
+					<p className="text-xs text-gray-400 font-medium">
+						Running the API server
+					</p>
+					<pre className="text-xs text-gray-300 bg-gray-950 rounded-lg p-3 overflow-x-auto">{`cd agent
+export VAULT_CONTRACT_ID="${vaultId || "<vault-contract-id>"}"
+export SERVER_PAYMENT_ADDRESS="G..."   # receives x402 payments
+pnpm start:server`}</pre>
+				</div>
+
+				<div className="space-y-2">
+					<p className="text-xs text-gray-400 font-medium">
+						Calling a paid endpoint
+					</p>
+					<pre className="text-xs text-gray-300 bg-gray-950 rounded-lg p-3 overflow-x-auto">{`# 1. Discover what payment is needed
+curl http://localhost:4000/opportunities
+# → 402 { paymentRequirements: { price: "500000", asset: "USDC:..." } }
+
+# 2. Pay via facilitator, get X-PAYMENT token, retry
+curl http://localhost:4000/opportunities \\
+  -H "X-PAYMENT: <signed-payment-token>"`}</pre>
+				</div>
+			</div>
+
+			{/* Start command */}
+			<div className="rounded-xl border border-gray-800 bg-gray-900 p-6 space-y-3">
 				<h2 className="text-sm font-semibold text-white">Running the Agent</h2>
-				<pre className="text-xs text-gray-400 bg-gray-950 rounded-lg p-3 overflow-x-auto">{`cd agent
-AGENT_SECRET_KEY=<your_key> \\
-VAULT_CONTRACT_ID=<vault_id> \\
+				<pre className="text-xs text-gray-300 bg-gray-950 rounded-lg p-4 overflow-x-auto leading-relaxed">{`cd agent
+
+# copy the values from the Pool Addresses section above
+export VAULT_CONTRACT_ID="${vaultId || "<vault-contract-id>"}"
+export VUSDC_CONTRACT_ID="${vusdcId || "<vusdc-contract-id>"}"
+
+# your agent keypair
+export AGENT_SECRET_KEY="S..."
+export AGENT_OWNER_ADDRESS="G..."
+
+# role: monitor | bidder | both
+export AGENT_ROLE="both"
+
 pnpm start`}</pre>
 				<p className="text-xs text-gray-500">
-					The agent runs the action model loop: scan positions → fetch prices →
-					generate ZK proofs → trigger auctions → bid → heartbeat.
+					ZK proving keys are loaded from{" "}
+					<code className="text-gray-400">../circuits/</code> by default. Set{" "}
+					<code className="text-gray-400">HF_WASM_PATH</code>,{" "}
+					<code className="text-gray-400">HF_ZKEY_PATH</code>, etc. to override.
 				</p>
 			</div>
 		</div>

@@ -7,7 +7,6 @@ const NAV = [
 	{ href: "/dashboard", label: "Vault" },
 	{ href: "/positions", label: "Positions" },
 	{ href: "/auctions", label: "Auctions" },
-	{ href: "/agent", label: "Agent" },
 ]
 
 export function Navbar() {
