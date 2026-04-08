@@ -102,6 +102,13 @@ export async function getHeartbeat(): Promise<number> {
 	return readContract<number>(CONTRACTS.vault, "get_heartbeat")
 }
 
+/** vUSDC token balance for a wallet address (standard SEP-41 `balance` call) */
+export async function getVusdcBalance(userAddress: string): Promise<bigint> {
+	return readContract<bigint>(CONTRACTS.vusdc, "balance", [
+		nativeToScVal(userAddress, { type: "address" }),
+	])
+}
+
 export async function getAllPositions(
 	count: bigint,
 ): Promise<[bigint, Position][]> {

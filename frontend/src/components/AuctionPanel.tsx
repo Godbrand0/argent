@@ -1,4 +1,6 @@
 "use client"
+import { AuctionLeaderboard } from "./AuctionLeaderboard"
+import { CopyButton } from "./CopyButton"
 import { InfoTooltip } from "./InfoTooltip"
 import { useAuctions } from "@/hooks/useVault"
 import { fmt7 } from "@/lib/config"
@@ -117,9 +119,12 @@ function AuctionCard({
 						Agent
 						<InfoTooltip text="The autonomous liquidator that identified this opportunity and triggered the auction." />
 					</p>
-					<p className="text-[11px] font-mono text-gray-300 truncate">
-						{auction.trigger_agent.slice(0, 8)}...
-					</p>
+					<div className="flex items-center gap-1.5 mt-0.5">
+						<span className="text-[11px] font-mono text-gray-300">
+							{auction.trigger_agent.slice(0, 8)}…
+						</span>
+						<CopyButton value={auction.trigger_agent} />
+					</div>
 				</div>
 				<div className="flex flex-col items-end">
 					<p className="text-[10px] text-gray-500 uppercase tracking-widest">
@@ -183,6 +188,11 @@ export function AuctionPanel() {
 					))}
 				</div>
 			)}
+
+			{/* Agent leaderboard */}
+			<div className="border-t border-gray-800 pt-8">
+				<AuctionLeaderboard />
+			</div>
 		</div>
 	)
 }

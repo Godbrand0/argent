@@ -11,7 +11,8 @@ import { server } from "./chain/soroban.js"
 import { CONFIG } from "./config.js"
 
 // The "Standard" dummy account used for simulation-only reads on Stellar
-const DUMMY_ADDRESS = "GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN"
+// A verified valid public key for simulation-only reads
+const DUMMY_ADDRESS = "GBV3HZAABDYP4EZQE2AH73MNDHWS322E4CZGTQ477K776UUHPKZ5I46B"
 
 /**
  * Perform a simulation-only contract call (won't cost XLM or require signing)
@@ -29,6 +30,7 @@ async function simulateContract(
 		sequenceNumber: () => "0",
 	}))
 
+	console.log(`[simulate] ${contractId}.${method}(${JSON.stringify(args)})`)
 	const contract = new Contract(contractId)
 	const tx = new TransactionBuilder(source as any, {
 		fee: "100",

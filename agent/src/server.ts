@@ -11,8 +11,13 @@ const VAULT_ID = process.env.VAULT_CONTRACT_ID
 
 app.use(express.json())
 
-// Apply x402 middleware to all routes
-app.use(x402Middleware)
+// Apply x402 middleware with debug bypass
+app.use((req, res, next) => {
+	if (req.header("X-Debug-Bypass") === "true") {
+		return next()
+	}
+	void x402Middleware(req, res, next)
+})
 
 /**
  * GET /

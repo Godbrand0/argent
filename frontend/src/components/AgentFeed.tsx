@@ -1,4 +1,5 @@
 "use client"
+import { CopyButton } from "./CopyButton"
 import { CONTRACTS, NETWORK } from "@/lib/config"
 
 const ENV_VARS = [
@@ -25,12 +26,20 @@ const ENV_VARS = [
 	{
 		key: "VAULT_CONTRACT_ID",
 		required: true,
+		default: CONTRACTS.vault,
 		desc: "The vault Soroban contract address. Copy it from the Pool Address box above.",
 	},
 	{
 		key: "VUSDC_CONTRACT_ID",
 		required: true,
+		default: CONTRACTS.vusdc,
 		desc: "The vUSDC token contract address. Returned by deploy.sh; also shown above.",
+	},
+	{
+		key: "ZK_VERIFIER_CONTRACT_ID",
+		required: true,
+		default: CONTRACTS.zkVerifier,
+		desc: "The ZK Verifier contract address used to verify health factor and price proofs.",
 	},
 	{
 		key: "MIN_PROFIT_THRESHOLD",
@@ -62,6 +71,7 @@ function CopyBox({ label, value }: { label: string; value: string }) {
 						<span className="text-gray-600 italic">not deployed yet</span>
 					)}
 				</code>
+				{value && <CopyButton value={value} />}
 			</div>
 		</div>
 	)
@@ -70,6 +80,9 @@ function CopyBox({ label, value }: { label: string; value: string }) {
 export function AgentFeed() {
 	const vaultId = CONTRACTS.vault
 	const vusdcId = CONTRACTS.vusdc
+	const usdcId = CONTRACTS.usdc
+	const xlmSacId = CONTRACTS.xlmSac
+	const zkVerifierId = CONTRACTS.zkVerifier
 	const rpcUrl = NETWORK.rpcUrl
 
 	return (
@@ -84,12 +97,16 @@ export function AgentFeed() {
 				</p>
 			</div>
 
-			{/* Pool addresses */}
 			<div className="rounded-xl border border-gray-800 bg-gray-900 p-6 space-y-4">
 				<h2 className="text-sm font-semibold text-white">Pool Addresses</h2>
-				<CopyBox label="Vault Contract ID" value={vaultId} />
-				<CopyBox label="vUSDC Contract ID" value={vusdcId} />
-				<CopyBox label="Soroban RPC" value={rpcUrl} />
+				<div className="grid sm:grid-cols-2 gap-x-8 gap-y-4">
+					<CopyBox label="Vault Contract ID" value={vaultId} />
+					<CopyBox label="vUSDC Contract ID" value={vusdcId} />
+					<CopyBox label="USDC Contract ID" value={usdcId} />
+					<CopyBox label="XLM SAC (Collateral)" value={xlmSacId} />
+					<CopyBox label="ZK Verifier ID" value={zkVerifierId} />
+					<CopyBox label="Soroban RPC" value={rpcUrl} />
+				</div>
 			</div>
 
 			{/* Agent roles */}
@@ -249,6 +266,7 @@ curl http://localhost:4000/opportunities \\
 # copy the values from the Pool Addresses section above
 export VAULT_CONTRACT_ID="${vaultId || "<vault-contract-id>"}"
 export VUSDC_CONTRACT_ID="${vusdcId || "<vusdc-contract-id>"}"
+export ZK_VERIFIER_CONTRACT_ID="${zkVerifierId || "<zk-verifier-id>"}"
 
 # your agent keypair
 export AGENT_SECRET_KEY="S..."

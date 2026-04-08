@@ -1,5 +1,7 @@
 "use client"
+import { CopyButton } from "./CopyButton"
 import { InfoTooltip } from "./InfoTooltip"
+import { LiquidationLeaderboard } from "./LiquidationLeaderboard"
 import { usePositions } from "@/hooks/useVault"
 import { fmt7, hfColor, hfBarPct, SCALE } from "@/lib/config"
 import { type Position } from "@/lib/vault"
@@ -46,9 +48,12 @@ function PositionCard({ id, pos }: { id: bigint; pos: Position }) {
 							Loan #{id.toString()}
 							<InfoTooltip text="The unique ID for this position on the Stellar network." />
 						</h3>
-						<p className="text-[11px] font-mono text-gray-500 mt-0.5">
-							{pos.owner.slice(0, 8)}...{pos.owner.slice(-4)}
-						</p>
+						<div className="flex items-center gap-1.5 mt-0.5">
+							<p className="text-[11px] font-mono text-gray-500">
+								{pos.owner.slice(0, 8)}…{pos.owner.slice(-4)}
+							</p>
+							<CopyButton value={pos.owner} />
+						</div>
 					</div>
 					<StatusBadge state={pos.auction_state.tag} />
 				</div>
@@ -135,6 +140,11 @@ export function PositionList() {
 					))}
 				</div>
 			)}
+
+			{/* Agent leaderboard */}
+			<div className="border-t border-gray-800 pt-8">
+				<LiquidationLeaderboard />
+			</div>
 		</div>
 	)
 }

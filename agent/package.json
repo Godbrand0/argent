@@ -5,8 +5,8 @@
   "type": "module",
   "main": "src/index.ts",
   "scripts": {
-    "start": "tsx src/index.ts",
-    "start:server": "tsx src/server.ts",
+    "start": "pnpm exec tsx src/index.ts",
+    "start:server": "pnpm exec tsx src/server.ts",
     "build": "tsc",
     "typecheck": "tsc --noEmit"
   },

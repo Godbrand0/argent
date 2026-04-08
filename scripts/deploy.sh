@@ -62,13 +62,16 @@ echo ""
 echo "=== Initializing contracts ==="
 ADMIN=$(stellar keys address admin)
 
-stellar contract invoke --id "$ZK_ID" --source admin --network "$NETWORK" \
+stellar contract invoke --id "$ZK_ID" --source admin \
+  --network "$NETWORK" --rpc-url "$RPC_URL" --network-passphrase "$NETWORK_PASSPHRASE" \
   -- initialize --admin "$ADMIN"
 
-stellar contract invoke --id "$VUSDC_ID" --source admin --network "$NETWORK" \
+stellar contract invoke --id "$VUSDC_ID" --source admin \
+  --network "$NETWORK" --rpc-url "$RPC_URL" --network-passphrase "$NETWORK_PASSPHRASE" \
   -- initialize --admin "$ADMIN" --vault "$VAULT_ID"
 
-stellar contract invoke --id "$VAULT_ID" --source admin --network "$NETWORK" \
+stellar contract invoke --id "$VAULT_ID" --source admin \
+  --network "$NETWORK" --rpc-url "$RPC_URL" --network-passphrase "$NETWORK_PASSPHRASE" \
   -- initialize \
     --admin "$ADMIN" \
     --usdc "$USDC_SAC" \
@@ -80,7 +83,8 @@ echo "=== Setting collateral configs ==="
 
 # XLM: 65% max LTV, 80% liq threshold, 30-min auction (~360 ledgers at 5s),
 #       ~0.0083%/ledger decay, 85% floor
-stellar contract invoke --id "$VAULT_ID" --source admin --network "$NETWORK" \
+stellar contract invoke --id "$VAULT_ID" --source admin \
+  --network "$NETWORK" --rpc-url "$RPC_URL" --network-passphrase "$NETWORK_PASSPHRASE" \
   -- set_collateral_config \
     --asset XLM \
     --token_address "$XLM_SAC" \

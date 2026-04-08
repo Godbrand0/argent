@@ -1,8 +1,11 @@
 import { Keypair, nativeToScVal, scValToNative } from "@stellar/stellar-sdk"
+import dotenv from "dotenv"
 import { invokeContract } from "./chain/soroban.js"
 import { CONFIG } from "./config.js"
 import { runScheduler } from "./scheduler.js"
 import { X402Client } from "./x402.js"
+
+dotenv.config()
 
 function validateConfig() {
 	if (!CONFIG.agent.secretKey) {

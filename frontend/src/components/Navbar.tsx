@@ -4,9 +4,13 @@ import { usePathname } from "next/navigation"
 import { WalletButton } from "./WalletButton"
 
 const NAV = [
-	{ href: "/dashboard", label: "Vault" },
+	{ href: "/dashboard", label: "Dashboard" },
+	{ href: "/lend", label: "Lend" },
+	{ href: "/borrow", label: "Borrow" },
 	{ href: "/positions", label: "Positions" },
 	{ href: "/auctions", label: "Auctions" },
+	{ href: "/agent", label: "Agent Access" },
+	{ href: "/profile", label: "Profile" },
 ]
 
 export function Navbar() {

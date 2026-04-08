@@ -1,10 +1,11 @@
 import {
 	encodePaymentRequiredHeader,
 	decodePaymentSignatureHeader,
-	X_PAYMENT_REQUIREMENTS,
-	X_PAYMENT,
-	X_PAYMENT_RESPONSE,
-} from "@x402/core"
+} from "@x402/core/http"
+
+const X_PAYMENT_REQUIREMENTS = "X-Payment-Requirements"
+const X_PAYMENT = "X-Payment"
+const X_PAYMENT_RESPONSE = "X-Payment-Response"
 import { type Request, type Response, type NextFunction } from "express"
 
 const FACILITATOR_URL =

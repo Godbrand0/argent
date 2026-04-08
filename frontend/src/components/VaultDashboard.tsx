@@ -1,60 +1,145 @@
 "use client"
 import Link from "next/link"
-import { useState } from "react"
 import { StatCard } from "./StatCard"
-import { usePoolStats } from "@/hooks/useVault"
-import { useWallet } from "@/hooks/useWallet"
+import { usePoolStats, usePositions } from "@/hooks/useVault"
 import { fmt7, fmtPct, SCALE } from "@/lib/config"
-import {
-	buildDepositTx,
-	buildWithdrawTx,
-	buildDepositCollateralTx,
-	buildBorrowTx,
-	buildRepayTx,
-} from "@/lib/vault"
 
 export function VaultDashboard() {
-	const { stats, loading } = usePoolStats()
-	const { publicKey, connected, sign } = useWallet()
+	const { stats, loading: statsLoading } = usePoolStats()
+	const { positions, loading: posLoading } = usePositions()
 
-	const tvl = stats ? fmt7(stats.totalDeposits, 0) : "—"
+	const loading = statsLoading || posLoading
+
+	const totalDeposited = stats ? `$${fmt7(stats.totalDeposits, 0)}` : "—"
+	const totalBorrowed = stats ? `$${fmt7(stats.totalBorrows, 0)}` : "—"
 	const util = stats ? fmtPct(stats.utilization) : "—"
 	const rate = stats ? fmtPct(stats.borrowRate) : "—"
-	const reserve = stats ? fmt7(stats.reserveFund) : "—"
+	const reserve = stats ? `$${fmt7(stats.reserveFund)}` : "—"
+
+	// Aggregate total XLM collateral across all positions
+	const totalCollateral = positions.reduce(
+		(sum, [, pos]) => sum + pos.collateral_amount,
+		0n,
+	)
+	const totalCollateralStr = posLoading
+		? "…"
+		: `${fmt7(totalCollateral, 0)} XLM`
+
+	const activePositions = positions.length
+	const atRisk = positions.filter(([, pos]) => {
+		if (pos.debt_principal === 0n) return false
+		const LIQ_THRESHOLD = 8_000_000n
+		const MOCK_XLM_PRICE = 1_100_000n
+		const colVal = (pos.collateral_amount * MOCK_XLM_PRICE) / SCALE
+		const hf = (colVal * LIQ_THRESHOLD) / pos.debt_principal
+		return hf < SCALE
+	}).length
 
 	return (
-		<div className="space-y-8">
+		<div className="space-y-10">
 			<div>
-				<h1 className="text-2xl font-bold text-white">Vault</h1>
+				<h1 className="text-2xl font-bold text-white">Dashboard</h1>
 				<p className="text-sm text-gray-400 mt-1">
-					Deposit USDC to earn yield, or borrow against XLM collateral.
+					Protocol-wide overview of the LiquidMind lending pool.
 				</p>
 			</div>
 
-			{/* Pool Stats */}
-			<div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-				<StatCard label="TVL" value={loading ? "…" : `$${tvl}`} accent />
+			{/* Primary stats */}
+			<div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+				<StatCard
+					label="Total Deposited by Lenders"
+					value={loading ? "…" : totalDeposited}
+					accent
+				/>
+				<StatCard
+					label="Total Borrowed"
+					value={loading ? "…" : totalBorrowed}
+				/>
+				<StatCard
+					label="Total Collateral Deposited"
+					value={loading ? "…" : totalCollateralStr}
+					sub="XLM locked by borrowers"
+				/>
 				<StatCard label="Utilization" value={loading ? "…" : util} />
 				<StatCard
 					label="Borrow Rate"
 					value={loading ? "…" : rate}
 					sub="annualized"
 				/>
-				<StatCard label="Reserve Fund" value={loading ? "…" : `$${reserve}`} />
+				<StatCard label="Reserve Fund" value={loading ? "…" : reserve} />
 			</div>
 
-			{!connected && (
-				<p className="text-sm text-gray-500 text-center py-4">
-					Connect your Freighter wallet to interact.
-				</p>
-			)}
-
-			{connected && publicKey && (
-				<div className="grid sm:grid-cols-2 gap-6">
-					<DepositPanel publicKey={publicKey} sign={sign} />
-					<BorrowPanel publicKey={publicKey} sign={sign} />
+			{/* Position health summary */}
+			<div className="rounded-xl border border-gray-800 bg-gray-900/50 p-5 grid grid-cols-2 sm:grid-cols-4 gap-4">
+				<div>
+					<p className="text-[10px] text-gray-500 uppercase tracking-wider">
+						Active Positions
+					</p>
+					<p className="text-2xl font-bold text-white mt-1">
+						{posLoading ? "…" : activePositions}
+					</p>
 				</div>
-			)}
+				<div>
+					<p className="text-[10px] text-gray-500 uppercase tracking-wider">
+						Positions at Risk
+					</p>
+					<p
+						className={`text-2xl font-bold mt-1 ${atRisk > 0 ? "text-red-400" : "text-green-400"}`}
+					>
+						{posLoading ? "…" : atRisk}
+					</p>
+				</div>
+				<div>
+					<p className="text-[10px] text-gray-500 uppercase tracking-wider">
+						Active Auctions
+					</p>
+					<p className="text-2xl font-bold text-white mt-1">
+						{statsLoading ? "…" : (stats?.auctionCount?.toString() ?? "0")}
+					</p>
+				</div>
+				<div>
+					<p className="text-[10px] text-gray-500 uppercase tracking-wider">
+						Total Loans
+					</p>
+					<p className="text-2xl font-bold text-white mt-1">
+						{statsLoading ? "…" : (stats?.positionCount?.toString() ?? "0")}
+					</p>
+				</div>
+			</div>
+
+			{/* CTA cards */}
+			<div className="grid sm:grid-cols-2 gap-4">
+				<div className="rounded-xl border border-indigo-900/40 bg-indigo-950/20 p-5 flex flex-col gap-3">
+					<div>
+						<p className="text-sm font-semibold text-white">Lend USDC</p>
+						<p className="text-xs text-gray-400 mt-1">
+							Deposit USDC to earn yield from borrower interest. Receive vUSDC
+							representing your share of the pool.
+						</p>
+					</div>
+					<Link
+						href="/lend"
+						className="self-start px-4 py-1.5 text-xs font-semibold rounded-md bg-indigo-600 hover:bg-indigo-500 text-white transition-colors"
+					>
+						Go to Lend →
+					</Link>
+				</div>
+				<div className="rounded-xl border border-gray-800 bg-gray-900/50 p-5 flex flex-col gap-3">
+					<div>
+						<p className="text-sm font-semibold text-white">Borrow USDC</p>
+						<p className="text-xs text-gray-400 mt-1">
+							Deposit XLM as collateral and borrow USDC against it. Keep your
+							health factor above 1.0 to avoid liquidation.
+						</p>
+					</div>
+					<Link
+						href="/borrow"
+						className="self-start px-4 py-1.5 text-xs font-semibold rounded-md bg-gray-700 hover:bg-gray-600 text-white transition-colors"
+					>
+						Go to Borrow →
+					</Link>
+				</div>
+			</div>
 
 			{/* Agent access callout */}
 			<div className="rounded-xl border border-gray-800 bg-gray-900/50 p-5 flex items-center justify-between gap-4">
@@ -73,241 +158,6 @@ export function VaultDashboard() {
 					Agent Access →
 				</Link>
 			</div>
-		</div>
-	)
-}
-
-// -------------------------------------------------------------------------
-// Deposit / Withdraw
-// -------------------------------------------------------------------------
-
-function DepositPanel({
-	publicKey,
-	sign,
-}: {
-	publicKey: string
-	sign: (xdr: string) => Promise<string>
-}) {
-	const [amount, setAmount] = useState("")
-	const [mode, setMode] = useState<"deposit" | "withdraw">("deposit")
-	const [loading, setLoading] = useState(false)
-	const [txHash, setTxHash] = useState<string | null>(null)
-	const [error, setError] = useState<string | null>(null)
-
-	async function submit() {
-		if (!amount || parseFloat(amount) <= 0) return
-		setLoading(true)
-		setError(null)
-		setTxHash(null)
-		try {
-			const scaled = BigInt(Math.round(parseFloat(amount) * 10_000_000))
-			const xdr =
-				mode === "deposit"
-					? await buildDepositTx(publicKey, scaled)
-					: await buildWithdrawTx(publicKey, scaled)
-			const hash = await sign(xdr)
-			setTxHash(hash)
-			setAmount("")
-		} catch (e) {
-			setError(e instanceof Error ? e.message : String(e))
-		} finally {
-			setLoading(false)
-		}
-	}
-
-	return (
-		<div className="rounded-xl border border-gray-800 bg-gray-900 p-6 space-y-4">
-			<div className="flex gap-2">
-				{(["deposit", "withdraw"] as const).map((m) => (
-					<button
-						key={m}
-						onClick={() => setMode(m)}
-						className={`flex-1 py-1.5 text-sm font-medium rounded-md transition-colors ${
-							mode === m
-								? "bg-indigo-600 text-white"
-								: "bg-gray-800 text-gray-400 hover:text-white"
-						}`}
-					>
-						{m.charAt(0).toUpperCase() + m.slice(1)}
-					</button>
-				))}
-			</div>
-			<div>
-				<label className="block text-xs text-gray-400 mb-1">
-					{mode === "deposit" ? "USDC Amount" : "vUSDC Amount"}
-				</label>
-				<input
-					type="number"
-					min="0"
-					step="0.01"
-					value={amount}
-					onChange={(e) => setAmount(e.target.value)}
-					placeholder="0.00"
-					className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500"
-				/>
-			</div>
-			<button
-				onClick={submit}
-				disabled={loading || !amount}
-				className="w-full py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 rounded-lg text-sm font-medium transition-colors"
-			>
-				{loading
-					? "Processing…"
-					: mode === "deposit"
-						? "Deposit USDC"
-						: "Withdraw USDC"}
-			</button>
-			{txHash && (
-				<p className="text-xs text-green-400 break-all">
-					Tx: {txHash.slice(0, 16)}…
-				</p>
-			)}
-			{error && <p className="text-xs text-red-400">{error}</p>}
-		</div>
-	)
-}
-
-// -------------------------------------------------------------------------
-// Deposit Collateral / Borrow / Repay
-// -------------------------------------------------------------------------
-
-function BorrowPanel({
-	publicKey,
-	sign,
-}: {
-	publicKey: string
-	sign: (xdr: string) => Promise<string>
-}) {
-	const [tab, setTab] = useState<"collateral" | "borrow" | "repay">(
-		"collateral",
-	)
-	const [amount, setAmount] = useState("")
-	const [positionId, setPositionId] = useState("0")
-	const [price, setPrice] = useState("0.11") // XLM price in USDC
-	const [loading, setLoading] = useState(false)
-	const [txHash, setTxHash] = useState<string | null>(null)
-	const [error, setError] = useState<string | null>(null)
-
-	async function submit() {
-		if (!amount || parseFloat(amount) <= 0) return
-		setLoading(true)
-		setError(null)
-		setTxHash(null)
-		try {
-			const scaled = BigInt(Math.round(parseFloat(amount) * 10_000_000))
-			const priceScaled = BigInt(Math.round(parseFloat(price) * 10_000_000))
-			const posId = BigInt(positionId)
-
-			let xdr: string
-			if (tab === "collateral") {
-				xdr = await buildDepositCollateralTx(publicKey, "XLM", scaled)
-			} else if (tab === "borrow") {
-				xdr = await buildBorrowTx(publicKey, posId, scaled, priceScaled)
-			} else {
-				xdr = await buildRepayTx(publicKey, posId, scaled)
-			}
-			const hash = await sign(xdr)
-			setTxHash(hash)
-			setAmount("")
-		} catch (e) {
-			setError(e instanceof Error ? e.message : String(e))
-		} finally {
-			setLoading(false)
-		}
-	}
-
-	return (
-		<div className="rounded-xl border border-gray-800 bg-gray-900 p-6 space-y-4">
-			<div className="flex gap-1">
-				{(
-					[
-						{ key: "collateral", label: "Add Collateral" },
-						{ key: "borrow", label: "Borrow" },
-						{ key: "repay", label: "Repay" },
-					] as const
-				).map((t) => (
-					<button
-						key={t.key}
-						onClick={() => setTab(t.key)}
-						className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-colors ${
-							tab === t.key
-								? "bg-indigo-600 text-white"
-								: "bg-gray-800 text-gray-400 hover:text-white"
-						}`}
-					>
-						{t.label}
-					</button>
-				))}
-			</div>
-
-			{tab !== "collateral" && (
-				<div>
-					<label className="block text-xs text-gray-400 mb-1">
-						Position ID
-					</label>
-					<input
-						type="number"
-						min="0"
-						value={positionId}
-						onChange={(e) => setPositionId(e.target.value)}
-						className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
-					/>
-				</div>
-			)}
-
-			{tab === "borrow" && (
-				<div>
-					<label className="block text-xs text-gray-400 mb-1">
-						XLM/USDC Price
-					</label>
-					<input
-						type="number"
-						step="0.001"
-						value={price}
-						onChange={(e) => setPrice(e.target.value)}
-						className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
-					/>
-				</div>
-			)}
-
-			<div>
-				<label className="block text-xs text-gray-400 mb-1">
-					{tab === "collateral"
-						? "XLM Amount"
-						: tab === "borrow"
-							? "USDC to Borrow"
-							: "USDC to Repay"}
-				</label>
-				<input
-					type="number"
-					min="0"
-					step="0.01"
-					value={amount}
-					onChange={(e) => setAmount(e.target.value)}
-					placeholder="0.00"
-					className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500"
-				/>
-			</div>
-
-			<button
-				onClick={submit}
-				disabled={loading || !amount}
-				className="w-full py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 rounded-lg text-sm font-medium transition-colors"
-			>
-				{loading
-					? "Processing…"
-					: tab === "collateral"
-						? "Deposit XLM"
-						: tab === "borrow"
-							? "Borrow USDC"
-							: "Repay USDC"}
-			</button>
-			{txHash && (
-				<p className="text-xs text-green-400 break-all">
-					Tx: {txHash.slice(0, 16)}…
-				</p>
-			)}
-			{error && <p className="text-xs text-red-400">{error}</p>}
 		</div>
 	)
 }
