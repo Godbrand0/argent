@@ -1,11 +1,8 @@
 "use client"
-import { useState } from "react"
+import { InfoTooltip } from "./InfoTooltip"
 import { useAuctions } from "@/hooks/useVault"
-import { useWallet } from "@/hooks/useWallet"
-import { fmt7, SCALE } from "@/lib/config"
-import { buildBidTx, type Auction } from "@/lib/vault"
-
-const SCALE_N = 10_000_000
+import { fmt7 } from "@/lib/config"
+import { type Auction } from "@/lib/vault"
 
 function DecayCurve({
 	auction,
@@ -14,53 +11,50 @@ function DecayCurve({
 	auction: Auction
 	currentPrice: bigint
 }) {
-	const startPct = 100
 	const floorPct =
 		(Number(auction.floor_price) / Number(auction.start_price)) * 100
 	const currentPct = (Number(currentPrice) / Number(auction.start_price)) * 100
 
 	return (
-		<div className="mt-3 relative h-12">
+		<div className="mt-4 relative h-16 group/curve">
 			<svg
 				className="w-full h-full"
-				viewBox="0 0 200 48"
+				viewBox="0 0 200 64"
 				preserveAspectRatio="none"
 			>
+				{/* background track */}
+				<rect x="0" y="31" width="200" height="2" fill="#1f2937" rx="1" />
 				{/* decay line */}
 				<line
 					x1="0"
-					y1="4"
+					y1="8"
 					x2="200"
-					y2={48 - 48 * (floorPct / 100)}
+					y2={64 - 64 * (floorPct / 100)}
 					stroke="#6366f1"
 					strokeWidth="2"
 					strokeDasharray="4,2"
-				/>
-				{/* floor */}
-				<line
-					x1="0"
-					y1={48 - 48 * (floorPct / 100)}
-					x2="200"
-					y2={48 - 48 * (floorPct / 100)}
-					stroke="#374151"
-					strokeWidth="1"
+					className="opacity-40"
 				/>
 				{/* current price marker */}
 				<circle
 					cx={`${currentPct}%`}
-					cy={48 - 48 * (currentPct / 100)}
-					r="4"
+					cy={64 - 64 * (currentPct / 100)}
+					r="5"
 					fill="#f59e0b"
+					className="shadow-xl"
 				/>
 			</svg>
-			<div className="absolute top-0 left-0 text-xs text-gray-500">
-				Start: ${fmt7(auction.start_price)}
+			<div className="absolute -top-1 left-0 text-[10px] text-gray-500 font-medium">
+				START: ${fmt7(auction.start_price, 0)}
 			</div>
-			<div className="absolute bottom-0 left-0 text-xs text-gray-500">
-				Floor: ${fmt7(auction.floor_price)}
+			<div className="absolute -bottom-1 left-0 text-[10px] text-gray-500 font-medium tracking-tighter">
+				FLOOR: ${fmt7(auction.floor_price, 0)}
 			</div>
-			<div className="absolute top-1/2 -translate-y-1/2 right-0 text-xs text-yellow-400">
-				Now: ${fmt7(currentPrice)}
+			<div
+				className="absolute top-1/2 -translate-y-1/2 text-[10px] text-yellow-500 font-bold bg-gray-900 px-1 py-0.5 rounded border border-yellow-500/20 shadow-lg transition-all group-hover/curve:scale-110"
+				style={{ left: `${currentPct}%` }}
+			>
+				NOW
 			</div>
 		</div>
 	)
@@ -75,11 +69,6 @@ function AuctionCard({
 	auction: Auction
 	currentPrice: bigint
 }) {
-	const { publicKey, connected, sign } = useWallet()
-	const [bidding, setBidding] = useState(false)
-	const [txHash, setTxHash] = useState<string | null>(null)
-	const [error, setError] = useState<string | null>(null)
-
 	const discount =
 		auction.start_price > 0n
 			? (
@@ -89,77 +78,66 @@ function AuctionCard({
 				).toFixed(1)
 			: "0.0"
 
-	async function placeBid() {
-		if (!publicKey) return
-		setBidding(true)
-		setError(null)
-		try {
-			const xdr = await buildBidTx(publicKey, id, currentPrice)
-			const hash = await sign(xdr)
-			setTxHash(hash)
-		} catch (e) {
-			setError(e instanceof Error ? e.message : String(e))
-		} finally {
-			setBidding(false)
-		}
-	}
-
 	return (
-		<div className="rounded-xl border border-orange-500/30 bg-gray-900 p-5 space-y-4">
+		<div className="rounded-2xl border border-gray-800 bg-gray-900/50 hover:border-orange-500/30 transition-all duration-300 p-6 space-y-6">
 			<div className="flex items-start justify-between">
 				<div>
-					<p className="text-xs text-gray-400">Auction #{id.toString()}</p>
-					<p className="text-sm text-gray-300 mt-0.5">
-						Position #{auction.position_id.toString()}
+					<h3 className="text-sm font-semibold text-gray-100 flex items-center">
+						Auction #{id.toString()}
+						<InfoTooltip text="LiquidMind uses Dutch Auctions to settle defaulted debt. The price drops over time." />
+					</h3>
+					<p className="text-[11px] text-gray-500 mt-0.5">
+						Targeting Position #{auction.position_id.toString()}
 					</p>
 				</div>
 				<div className="text-right">
-					<p className="text-lg font-semibold text-yellow-400">
-						${fmt7(currentPrice)}
+					<p className="text-xs text-gray-500 uppercase tracking-widest flex items-center justify-end">
+						Discount
+						<InfoTooltip text="The current profit margin available for an agent to settle this auction." />
 					</p>
-					<p className="text-xs text-green-400">{discount}% discount</p>
+					<p className="text-xl font-black text-green-400">{discount}%</p>
 				</div>
+			</div>
+
+			<div>
+				<p className="text-[10px] text-gray-500 uppercase tracking-widest mb-1 flex items-center">
+					Settlement Price
+					<InfoTooltip text="The amount of USDC an agent must pay to claim the discounted XLM collateral." />
+				</p>
+				<p className="text-3xl font-bold text-white tracking-tight">
+					${fmt7(currentPrice, 2)}
+				</p>
 			</div>
 
 			<DecayCurve auction={auction} currentPrice={currentPrice} />
 
-			<div className="grid grid-cols-2 gap-3 text-sm">
+			<div className="grid grid-cols-2 gap-4 pt-4 border-t border-gray-800/50">
 				<div>
-					<p className="text-xs text-gray-400">Start Price</p>
-					<p className="text-white">${fmt7(auction.start_price)}</p>
-				</div>
-				<div>
-					<p className="text-xs text-gray-400">Floor Price</p>
-					<p className="text-white">${fmt7(auction.floor_price)}</p>
-				</div>
-				<div>
-					<p className="text-xs text-gray-400">Triggered by</p>
-					<p className="text-white font-mono text-xs">
-						{auction.trigger_agent.slice(0, 6)}…
-						{auction.trigger_agent.slice(-4)}
+					<p className="text-[10px] text-gray-500 uppercase tracking-widest flex items-center">
+						Agent
+						<InfoTooltip text="The autonomous liquidator that identified this opportunity and triggered the auction." />
+					</p>
+					<p className="text-[11px] font-mono text-gray-300 truncate">
+						{auction.trigger_agent.slice(0, 8)}...
 					</p>
 				</div>
-				<div>
-					<p className="text-xs text-gray-400">Started at ledger</p>
-					<p className="text-white">{auction.started_at_ledger}</p>
+				<div className="flex flex-col items-end">
+					<p className="text-[10px] text-gray-500 uppercase tracking-widest">
+						Status
+					</p>
+					<span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-yellow-500/10 text-yellow-500 border border-yellow-500/20">
+						<span className="w-1 h-1 rounded-full bg-yellow-500 mr-1.5 animate-pulse" />
+						ACTIVE
+					</span>
 				</div>
 			</div>
 
-			{connected && (
-				<button
-					onClick={placeBid}
-					disabled={bidding}
-					className="w-full py-2 bg-yellow-500 hover:bg-yellow-400 text-black font-semibold text-sm rounded-lg disabled:opacity-50 transition-colors"
-				>
-					{bidding ? "Bidding…" : `Bid $${fmt7(currentPrice)}`}
-				</button>
-			)}
-			{txHash && (
-				<p className="text-xs text-green-400 break-all">
-					Settled! Tx: {txHash.slice(0, 16)}…
+			<div className="bg-blue-500/5 border border-blue-500/10 rounded-xl p-3">
+				<p className="text-[10px] text-blue-400 font-medium leading-relaxed">
+					Note: Manual bidding is disabled. This auction is being monitored by
+					the LiquidMind agent network.
 				</p>
-			)}
-			{error && <p className="text-xs text-red-400">{error}</p>}
+			</div>
 		</div>
 	)
 }
@@ -168,35 +146,43 @@ export function AuctionPanel() {
 	const { auctions, prices, loading } = useAuctions()
 
 	return (
-		<div className="space-y-6">
-			<div>
-				<h1 className="text-2xl font-bold text-white">Auctions</h1>
-				<p className="text-sm text-gray-400 mt-1">
-					Dutch auctions for undercollateralized positions. Price decays over
-					time — bid when profitable.
+		<div className="space-y-8 max-w-6xl mx-auto py-4">
+			<div className="border-b border-gray-800 pb-6">
+				<h1 className="text-3xl font-bold text-white tracking-tight">
+					Auctions
+				</h1>
+				<p className="text-sm text-gray-400 mt-2 max-w-2xl">
+					The protocol marketplace for discounted collateral. Prices decay over
+					time until an autonomous agent strikes a profitable deal.
 				</p>
 			</div>
 
-			{loading && (
-				<div className="text-center py-16 text-gray-500">Loading auctions…</div>
-			)}
-
-			{!loading && auctions.length === 0 && (
-				<div className="text-center py-16 text-gray-500">
-					No active auctions. All positions are healthy.
+			{loading ? (
+				<div className="flex flex-col items-center justify-center py-24 space-y-4">
+					<div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
+					<p className="text-xs text-gray-500 animate-pulse">
+						Reading auction book...
+					</p>
+				</div>
+			) : auctions.length === 0 ? (
+				<div className="text-center py-20 bg-gray-900/30 rounded-3xl border border-dashed border-gray-800">
+					<p className="text-gray-500 text-sm">No active auctions right now.</p>
+					<p className="text-[11px] text-gray-600 mt-1">
+						Healthy protocols have empty auction books.
+					</p>
+				</div>
+			) : (
+				<div className="grid sm:grid-cols-2 gap-8">
+					{auctions.map(([id, auction]) => (
+						<AuctionCard
+							key={id.toString()}
+							id={id}
+							auction={auction}
+							currentPrice={prices[id.toString()] ?? auction.start_price}
+						/>
+					))}
 				</div>
 			)}
-
-			<div className="grid sm:grid-cols-2 gap-4">
-				{auctions.map(([id, auction]) => (
-					<AuctionCard
-						key={id.toString()}
-						id={id}
-						auction={auction}
-						currentPrice={prices[id.toString()] ?? auction.start_price}
-					/>
-				))}
-			</div>
 		</div>
 	)
 }

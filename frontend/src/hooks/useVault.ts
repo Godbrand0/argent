@@ -1,6 +1,7 @@
 "use client"
 import { useState, useEffect, useCallback } from "react"
 import { CONTRACTS } from "@/lib/config"
+import { MOCK_POSITIONS, MOCK_AUCTIONS, MOCK_PRICES } from "@/lib/mock_data"
 import {
 	getPoolStats,
 	getAllPositions,
@@ -44,13 +45,19 @@ export function usePositions() {
 	const [loading, setLoading] = useState(true)
 
 	const refresh = useCallback(async () => {
-		if (!CONTRACTS.vault) return
+		if (!CONTRACTS.vault) {
+			setPositions(MOCK_POSITIONS)
+			setLoading(false)
+			return
+		}
 		try {
 			const stats = await getPoolStats()
 			const pos = await getAllPositions(stats.positionCount)
-			setPositions(pos)
+			// Fallback to mock data if empty
+			setPositions(pos.length > 0 ? pos : MOCK_POSITIONS)
 		} catch {
-			/* rpc not configured */
+			// Fallback to mock data on error/missing config
+			setPositions(MOCK_POSITIONS)
 		} finally {
 			setLoading(false)
 		}
@@ -73,21 +80,34 @@ export function useAuctions() {
 	const [loading, setLoading] = useState(true)
 
 	const refresh = useCallback(async () => {
-		if (!CONTRACTS.vault) return
+		if (!CONTRACTS.vault) {
+			setAuctions(MOCK_AUCTIONS)
+			setPrices(MOCK_PRICES)
+			setLoading(false)
+			return
+		}
 		try {
 			const stats = await getPoolStats()
 			const active = await getAllActiveAuctions(stats.auctionCount)
-			setAuctions(active)
-			const priceMap: Record<string, bigint> = {}
-			await Promise.all(
-				active.map(async ([id]) => {
-					try {
-						priceMap[id.toString()] = await getCurrentAuctionPrice(id)
-					} catch {}
-				}),
-			)
-			setPrices(priceMap)
+
+			if (active.length > 0) {
+				setAuctions(active)
+				const priceMap: Record<string, bigint> = {}
+				await Promise.all(
+					active.map(async ([id]) => {
+						try {
+							priceMap[id.toString()] = await getCurrentAuctionPrice(id)
+						} catch {}
+					}),
+				)
+				setPrices(priceMap)
+			} else {
+				setAuctions(MOCK_AUCTIONS)
+				setPrices(MOCK_PRICES)
+			}
 		} catch {
+			setAuctions(MOCK_AUCTIONS)
+			setPrices(MOCK_PRICES)
 		} finally {
 			setLoading(false)
 		}

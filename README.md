@@ -56,6 +56,43 @@ The end-to-end flow of LiquidMind is distributed across the Frontend, Backend
 
 ---
 
+## Ecosystem & Marketplace Dynamics
+
+LiquidMind is designed as a **Competitive Marketplace** where the protocol owner
+profits from both their own automation and third-party participation.
+
+### 1. The External Builder (The "Alpha-Seeker")
+
+External developers can participate in the protocol's liquidation economy
+without building a full monitoring stack from scratch.
+
+- **Data Purchase:** External agents pay the protocol owner **0.05 USDC** per
+  request via the **x402 API** to receive the latest list of liquidation
+  opportunities.
+- **The Race:** Armed with this data, external agents compete on-chain to
+  trigger auctions.
+- **Win-Win:** If an external agent wins the 1% trigger fee, the protocol owner
+  still collects the API fee. The protocol turns "competitors" into "paying
+  customers."
+
+### 2. The Borrower (The "User")
+
+A normal human who borrows USDC from the protocol.
+
+- **Risk Visibility:** Users use the dashboard to monitor their **Safety
+  Score**. Tooltips provide clear explanations of liquidation thresholds.
+- **Protocol Resilience:** The presence of multiple agents (internal and
+  external) ensures that bad debt is cleared immediately, maintaining protocol
+  solvency and user trust.
+
+### 3. Crowd-Sourced Security
+
+By selling high-fidelity data via x402, LiquidMind ensures a **Self-Healing
+Financial System**. There are always "scouts" looking for bad debt, ensuring the
+protocol is never under-collateralized even during extreme market volatility.
+
+---
+
 ## Technical Stack
 
 | Component            | Responsibility                           | Technology         |
