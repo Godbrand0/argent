@@ -5,7 +5,7 @@ import {
 	type Keypair,
 } from "@stellar/stellar-sdk"
 import { computeTWAP } from "../chain/horizon.js"
-import { invokeContract } from "../chain/soroban.js"
+import { invokeContract, simulateContractRead } from "../chain/soroban.js"
 import { CONFIG } from "../config.js"
 import { type Action, AgentState, type Position } from "../types.js"
 
@@ -18,8 +18,9 @@ export function buildMonitorActions(keypair: Keypair): Action[] {
 			name: "heartbeat",
 			priority: 100,
 			preconditions: (s) =>
-				s.ledgerSinceHeartbeat > CONFIG.agent.heartbeatIntervalLedgers,
-			execute: async () => {
+				s.currentLedger - s.lastHeartbeatLedger >
+				CONFIG.agent.heartbeatIntervalLedgers,
+			execute: async (s) => {
 				console.log("[heartbeat] sending...")
 				await invokeContract(
 					CONFIG.contracts.vault,
@@ -27,6 +28,7 @@ export function buildMonitorActions(keypair: Keypair): Action[] {
 					[nativeToScVal(keypair.publicKey(), { type: "address" })],
 					keypair,
 				)
+				s.lastHeartbeatLedger = s.currentLedger
 				console.log("[heartbeat] sent")
 			},
 		},
@@ -144,11 +146,10 @@ export function buildMonitorActions(keypair: Keypair): Action[] {
 				Date.now() - s.lastScan > CONFIG.agent.scanIntervalMs,
 			execute: async (s) => {
 				console.log("[scan_positions] scanning...")
-				const count = await invokeContract(
+				const count = await simulateContractRead(
 					CONFIG.contracts.vault,
 					"position_count",
 					[],
-					keypair,
 				)
 				const total = scValToNative(count) as bigint
 				const positions: Position[] = []
@@ -157,11 +158,10 @@ export function buildMonitorActions(keypair: Keypair): Action[] {
 				const limit = total < 50n ? total : 50n
 				for (let id = 0n; id < limit; id++) {
 					try {
-						const raw = await invokeContract(
+						const raw = await simulateContractRead(
 							CONFIG.contracts.vault,
 							"get_position",
 							[nativeToScVal(id, { type: "u64" })],
-							keypair,
 						)
 						const native = scValToNative(raw) as any
 						positions.push({

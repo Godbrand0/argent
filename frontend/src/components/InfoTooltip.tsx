@@ -9,7 +9,7 @@ export function InfoTooltip({ text }: Props) {
 	const [visible, setVisible] = useState(false)
 
 	return (
-		<div className="relative inline-block ml-1 group">
+		<span className="relative inline-block ml-1 group">
 			<button
 				onMouseEnter={() => setVisible(true)}
 				onMouseLeave={() => setVisible(false)}
@@ -34,11 +34,17 @@ export function InfoTooltip({ text }: Props) {
 			</button>
 
 			{visible && (
-				<div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-gray-800 border border-gray-700 text-gray-200 text-[10px] leading-tight rounded shadow-xl z-50 pointer-events-none">
+				<span
+					className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-gray-800 border border-gray-700 text-gray-200 text-[10px] leading-tight rounded shadow-xl z-50 pointer-events-none"
+					style={{ display: "block" }}
+				>
 					{text}
-					<div className="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-gray-800" />
-				</div>
+					<span
+						className="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-gray-800"
+						style={{ display: "block" }}
+					/>
+				</span>
 			)}
-		</div>
+		</span>
 	)
 }

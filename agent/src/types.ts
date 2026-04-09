@@ -72,7 +72,8 @@ export interface AgentState {
 	agentUsdcBalance: bigint
 	agentBudget: bigint
 	lastScan: number
-	ledgerSinceHeartbeat: number
+	lastAuctionScan: number
+	lastHeartbeatLedger: number
 	currentLedger: number
 	/** IDs of auctions this agent has already placed a limit bid on */
 	placedBidAuctionIds: Set<string>

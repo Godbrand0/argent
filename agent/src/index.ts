@@ -1,6 +1,6 @@
 import { Keypair, nativeToScVal, scValToNative } from "@stellar/stellar-sdk"
 import dotenv from "dotenv"
-import { invokeContract } from "./chain/soroban.js"
+import { invokeContract, server } from "./chain/soroban.js"
 import { CONFIG } from "./config.js"
 import { runScheduler } from "./scheduler.js"
 import { X402Client } from "./x402.js"
@@ -62,6 +62,62 @@ async function ensureRegistered(keypair: Keypair): Promise<void> {
 	console.log(`[init] registered. Owner: ${ownerAddress}`)
 }
 
+/**
+ * Ensure the agent account exists on the network.
+ * If not found and on testnet, attempts to fund via Friendbot.
+ */
+async function ensureAccountExists(publicKey: string): Promise<void> {
+	const maxRetries = 3
+	for (let attempt = 1; attempt <= maxRetries; attempt++) {
+		try {
+			await server.getAccount(publicKey)
+			console.log("[init] agent account found on-chain")
+			return
+		} catch (err: any) {
+			const isNotFound =
+				err?.response?.status === 404 ||
+				err?.message?.includes("Account not found")
+
+			// Only auto-fund if it's a 404/Not Found and we're on Testnet
+			const isTestnet = CONFIG.network.rpcUrl.includes("testnet")
+			if (isNotFound && isTestnet) {
+				if (attempt === 1) {
+					console.log(
+						`[init] account ${publicKey} not found. Funding via Friendbot...`,
+					)
+					const response = await fetch(
+						`https://friendbot-testnet.stellar.org/?addr=${publicKey}`,
+					)
+					if (!response.ok) {
+						console.error(
+							`[init] Friendbot funding failed: ${response.statusText}`,
+						)
+					} else {
+						console.log("[init] funded successfully")
+					}
+				}
+
+				if (attempt < maxRetries) {
+					console.log(
+						`[init] waiting for ingestion (attempt ${attempt}/${maxRetries})...`,
+					)
+					await new Promise((resolve) => setTimeout(resolve, 5000))
+					continue
+				}
+			}
+
+			// If we're here, it's either not a 404, or we've exhausted retries
+			if (isNotFound && isTestnet) {
+				throw new Error(
+					`Account ${publicKey} still not found after funding and ${maxRetries} attempts. ` +
+						`This might be due to RPC ingestion lag. Try using a different RPC URL or wait a moment.`,
+				)
+			}
+			throw err
+		}
+	}
+}
+
 async function main() {
 	validateConfig()
 
@@ -77,7 +133,10 @@ async function main() {
 	const x402 = new X402Client(keypair)
 	console.log("[x402] client initialized")
 
-	// Register in the pool before starting the action loop
+	// 1. Ensure account exists (and fund if testnet + missing)
+	await ensureAccountExists(keypair.publicKey())
+
+	// 2. Register in the pool before starting the action loop
 	await ensureRegistered(keypair)
 
 	await runScheduler(keypair, CONFIG.agent.role)

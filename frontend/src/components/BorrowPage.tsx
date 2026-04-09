@@ -1,5 +1,6 @@
 "use client"
 import { useState } from "react"
+import { useProfile } from "@/hooks/useProfile"
 import { usePoolStats } from "@/hooks/useVault"
 import { useWallet } from "@/hooks/useWallet"
 import { fmt7, fmtPct } from "@/lib/config"
@@ -63,7 +64,7 @@ export function BorrowPage() {
 					</p>
 				</div>
 			) : (
-				<BorrowPanel publicKey={publicKey!} sign={sign} />
+				<BorrowPanelWrapper publicKey={publicKey!} sign={sign} />
 			)}
 
 			<div className="rounded-xl border border-orange-900/30 bg-orange-950/10 p-5 space-y-2">
@@ -92,19 +93,42 @@ export function BorrowPage() {
 	)
 }
 
-function BorrowPanel({
+function BorrowPanelWrapper({
 	publicKey,
 	sign,
 }: {
 	publicKey: string
 	sign: (xdr: string) => Promise<string>
 }) {
+	const { myPositions, loading } = useProfile(publicKey)
+	if (loading)
+		return <p className="text-sm text-gray-500">Loading positions…</p>
+	return (
+		<BorrowPanel publicKey={publicKey} sign={sign} myPositions={myPositions} />
+	)
+}
+
+function BorrowPanel({
+	publicKey,
+	sign,
+	myPositions,
+}: {
+	publicKey: string
+	sign: (xdr: string) => Promise<string>
+	myPositions: [bigint, import("@/lib/vault").Position][]
+}) {
 	const [tab, setTab] = useState<"collateral" | "borrow" | "repay">(
 		"collateral",
 	)
 	const [amount, setAmount] = useState("")
-	const [positionId, setPositionId] = useState("0")
+	// Always derive positionId from selection; for single position it's always fixed
+	const [positionId, setPositionId] = useState(() =>
+		myPositions.length > 0 ? myPositions[0][0].toString() : "0",
+	)
+	const effectivePositionId =
+		myPositions.length === 1 ? myPositions[0][0].toString() : positionId
 	const [price, setPrice] = useState("0.11")
+	const [loanTerm, setLoanTerm] = useState(120_960) // default 7 days
 	const [loading, setLoading] = useState(false)
 	const [txHash, setTxHash] = useState<string | null>(null)
 	const [error, setError] = useState<string | null>(null)
@@ -117,13 +141,19 @@ function BorrowPanel({
 		try {
 			const scaled = BigInt(Math.round(parseFloat(amount) * 10_000_000))
 			const priceScaled = BigInt(Math.round(parseFloat(price) * 10_000_000))
-			const posId = BigInt(positionId)
+			const posId = BigInt(effectivePositionId)
 
 			let xdr: string
 			if (tab === "collateral") {
 				xdr = await buildDepositCollateralTx(publicKey, "XLM", scaled)
 			} else if (tab === "borrow") {
-				xdr = await buildBorrowTx(publicKey, posId, scaled, priceScaled)
+				xdr = await buildBorrowTx(
+					publicKey,
+					posId,
+					scaled,
+					priceScaled,
+					loanTerm,
+				)
 			} else {
 				xdr = await buildRepayTx(publicKey, posId, scaled)
 			}
@@ -163,32 +193,82 @@ function BorrowPanel({
 
 			{tab !== "collateral" && (
 				<div>
-					<label className="block text-xs text-gray-400 mb-1">
-						Position ID
-					</label>
-					<input
-						type="number"
-						min="0"
-						value={positionId}
-						onChange={(e) => setPositionId(e.target.value)}
-						className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
-					/>
+					<label className="block text-xs text-gray-400 mb-1">Position</label>
+					{myPositions.length === 0 ? (
+						<p className="text-xs text-yellow-400">
+							No positions found. Deposit XLM collateral first.
+						</p>
+					) : myPositions.length === 1 ? (
+						<div className="w-full bg-gray-800/50 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm">
+							#{myPositions[0][0].toString()} —{" "}
+							{fmt7(myPositions[0][1].collateral_amount, 2)}{" "}
+							{myPositions[0][1].collateral_asset} collateral
+							{myPositions[0][1].debt_principal > 0n
+								? `, $${fmt7(myPositions[0][1].debt_principal, 2)} debt`
+								: ""}
+						</div>
+					) : (
+						<select
+							value={positionId}
+							onChange={(e) => setPositionId(e.target.value)}
+							className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
+						>
+							{myPositions.map(([id, pos]) => (
+								<option key={id.toString()} value={id.toString()}>
+									#{id.toString()} — {fmt7(pos.collateral_amount, 2)}{" "}
+									{pos.collateral_asset} collateral
+									{pos.debt_principal > 0n
+										? `, $${fmt7(pos.debt_principal, 2)} debt`
+										: ""}
+								</option>
+							))}
+						</select>
+					)}
 				</div>
 			)}
 
 			{tab === "borrow" && (
-				<div>
-					<label className="block text-xs text-gray-400 mb-1">
-						XLM/USDC Price (for HF check)
-					</label>
-					<input
-						type="number"
-						step="0.001"
-						value={price}
-						onChange={(e) => setPrice(e.target.value)}
-						className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
-					/>
-				</div>
+				<>
+					<div>
+						<label className="block text-xs text-gray-400 mb-1">
+							XLM/USDC Price (for HF check)
+						</label>
+						<input
+							type="number"
+							step="0.001"
+							value={price}
+							onChange={(e) => setPrice(e.target.value)}
+							className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
+						/>
+					</div>
+					<div>
+						<label className="block text-xs text-gray-400 mb-2">
+							Loan Term
+						</label>
+						<div className="grid grid-cols-3 gap-2">
+							{(
+								[
+									{ label: "7 days", ledgers: 120_960 },
+									{ label: "14 days", ledgers: 241_920 },
+									{ label: "30 days", ledgers: 518_400 },
+								] as const
+							).map((opt) => (
+								<button
+									key={opt.ledgers}
+									type="button"
+									onClick={() => setLoanTerm(opt.ledgers)}
+									className={`py-2 text-xs font-semibold rounded-lg transition-colors ${
+										loanTerm === opt.ledgers
+											? "bg-indigo-600 text-white"
+											: "bg-gray-800 text-gray-400 hover:text-white"
+									}`}
+								>
+									{opt.label}
+								</button>
+							))}
+						</div>
+					</div>
+				</>
 			)}
 
 			<div>

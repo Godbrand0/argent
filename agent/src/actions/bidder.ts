@@ -3,7 +3,7 @@ import {
 	scValToNative,
 	type Keypair,
 } from "@stellar/stellar-sdk"
-import { invokeContract } from "../chain/soroban.js"
+import { invokeContract, simulateContractRead } from "../chain/soroban.js"
 import { CONFIG } from "../config.js"
 import { type Action, type AgentState, type Auction } from "../types.js"
 
@@ -20,6 +20,7 @@ export function buildBidderActions(keypair: Keypair): Action[] {
 			priority: 90,
 			preconditions: (s) =>
 				s.biddableAuctions.length > 0 &&
+				s.agentBudget > 0n &&
 				s.biddableAuctions.some(
 					(a) => !s.placedBidAuctionIds.has(a.id.toString()),
 				),
@@ -31,12 +32,9 @@ export function buildBidderActions(keypair: Keypair): Action[] {
 					// e.g. market = 100, threshold = 5% → maxPrice = 95.
 					// We're willing to pay up to 95 but will actually pay whatever
 					// the Dutch price is when settle_auction fires (could be less).
+					// TODO: for multi-asset collateral, look up the asset from s.positions
 					const marketPrice = BigInt(
-						Math.round(
-							(s.priceCache.prices[auction.positionId.toString()] ??
-								s.priceCache.prices["XLM"] ??
-								0) * 10_000_000,
-						),
+						Math.round((s.priceCache.prices["XLM"] ?? 0) * 10_000_000),
 					)
 
 					if (marketPrice === 0n) continue
@@ -183,13 +181,13 @@ export function buildBidderActions(keypair: Keypair): Action[] {
 		{
 			name: "watch_auctions",
 			priority: 60,
-			preconditions: () => true,
+			preconditions: (s) =>
+				Date.now() - s.lastAuctionScan > CONFIG.agent.scanIntervalMs,
 			execute: async (s) => {
-				const countRaw = await invokeContract(
+				const countRaw = await simulateContractRead(
 					CONFIG.contracts.vault,
 					"auction_count",
 					[],
-					keypair,
 				)
 				const total = scValToNative(countRaw) as bigint
 				const auctions: Auction[] = []
@@ -197,11 +195,10 @@ export function buildBidderActions(keypair: Keypair): Action[] {
 				const limit = total < 20n ? total : 20n
 				for (let id = 0n; id < limit; id++) {
 					try {
-						const raw = await invokeContract(
+						const raw = await simulateContractRead(
 							CONFIG.contracts.vault,
 							"get_auction",
 							[nativeToScVal(id, { type: "u64" })],
-							keypair,
 						)
 						const native = scValToNative(raw) as any
 						if (!native.settled) {
@@ -229,6 +226,7 @@ export function buildBidderActions(keypair: Keypair): Action[] {
 				}
 
 				s.activeAuctions = auctions
+				s.lastAuctionScan = Date.now()
 				console.log(`[watch_auctions] ${auctions.length} active auctions`)
 			},
 		},

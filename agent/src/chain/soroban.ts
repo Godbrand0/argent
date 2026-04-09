@@ -10,6 +10,9 @@ import {
 } from "@stellar/stellar-sdk"
 import { CONFIG } from "../config.js"
 
+// Verified valid public key used for simulation-only reads (no signing required)
+const DUMMY_ADDRESS = "GBV3HZAABDYP4EZQE2AH73MNDHWS322E4CZGTQ477K776UUHPKZ5I46B"
+
 export const server = new rpc.Server(CONFIG.network.rpcUrl, {
 	allowHttp: false,
 })
@@ -28,7 +31,7 @@ export async function invokeContract(
 		networkPassphrase: CONFIG.network.networkPassphrase,
 	})
 		.addOperation(contract.call(method, ...args))
-		.setTimeout(30)
+		.setTimeout(300)
 		.build()
 
 	const simResult = await server.simulateTransaction(tx)
@@ -62,6 +65,38 @@ export async function invokeContract(
 	}
 
 	return getResult.returnValue ?? xdr.ScVal.scvVoid()
+}
+
+/**
+ * Simulate a read-only contract call. Does not submit a transaction,
+ * costs no XLM, and does not require the keypair to sign.
+ */
+export async function simulateContractRead(
+	contractId: string,
+	method: string,
+	args: xdr.ScVal[],
+): Promise<xdr.ScVal> {
+	const source = await server.getAccount(DUMMY_ADDRESS).catch(() => ({
+		accountId: () => DUMMY_ADDRESS,
+		sequenceNumber: () => "0",
+	}))
+	const contract = new Contract(contractId)
+	const tx = new TransactionBuilder(source as any, {
+		fee: BASE_FEE,
+		networkPassphrase: CONFIG.network.networkPassphrase,
+	})
+		.addOperation(contract.call(method, ...args))
+		.setTimeout(0)
+		.build()
+
+	const sim = await server.simulateTransaction(tx)
+	if (rpc.Api.isSimulationError(sim)) {
+		throw new Error(`Simulation failed: ${sim.error}`)
+	}
+	return (
+		(sim as rpc.Api.SimulateTransactionSuccessResponse).result?.retval ??
+		xdr.ScVal.scvVoid()
+	)
 }
 
 export async function readContractData(

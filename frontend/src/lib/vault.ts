@@ -109,6 +109,20 @@ export async function getVusdcBalance(userAddress: string): Promise<bigint> {
 	])
 }
 
+/** USDC token balance for a wallet address */
+export async function getUsdcBalance(userAddress: string): Promise<bigint> {
+	return readContract<bigint>(CONTRACTS.usdc, "balance", [
+		nativeToScVal(userAddress, { type: "address" }),
+	])
+}
+
+/** Native XLM balance via the XLM Stellar Asset Contract */
+export async function getXlmBalance(userAddress: string): Promise<bigint> {
+	return readContract<bigint>(CONTRACTS.xlmSac, "balance", [
+		nativeToScVal(userAddress, { type: "address" }),
+	])
+}
+
 export async function getAllPositions(
 	count: bigint,
 ): Promise<[bigint, Position][]> {
@@ -199,6 +213,7 @@ export async function buildBorrowTx(
 	positionId: bigint,
 	usdcAmount: bigint,
 	price: bigint,
+	loanTermLedgers: number = 120_960, // default 7 days
 ): Promise<string> {
 	return buildContractTx(
 		CONTRACTS.vault,
@@ -208,6 +223,7 @@ export async function buildBorrowTx(
 			nativeToScVal(positionId, { type: "u64" }),
 			nativeToScVal(usdcAmount, { type: "i128" }),
 			nativeToScVal(price, { type: "i128" }),
+			nativeToScVal(loanTermLedgers, { type: "u32" }),
 		],
 		user,
 	)

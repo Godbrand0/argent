@@ -110,9 +110,14 @@ function PositionCard({ id, pos }: { id: bigint; pos: Position }) {
 
 export function ProfilePage() {
 	const { publicKey, connected } = useWallet()
-	const { vusdcBalance, poolStats, myPositions, loading } = useProfile(
-		publicKey ?? null,
-	)
+	const {
+		vusdcBalance,
+		usdcBalance,
+		xlmBalance,
+		poolStats,
+		myPositions,
+		loading,
+	} = useProfile(publicKey ?? null)
 	const [tab, setTab] = useState<"lender" | "borrower">("lender")
 
 	if (!connected || !publicKey) {
@@ -217,6 +222,49 @@ export function ProfilePage() {
 								<p className="text-xl font-bold text-red-400">{atRiskCount}</p>
 							</div>
 						)}
+					</div>
+				</div>
+
+				{/* Wallet balances */}
+				<div className="mt-5 pt-5 border-t border-gray-800 grid grid-cols-3 gap-4">
+					<div className="rounded-xl bg-gray-800/50 px-4 py-3 flex items-center gap-3">
+						<div className="w-8 h-8 rounded-full bg-blue-950/60 border border-blue-900/40 flex items-center justify-center shrink-0">
+							<span className="text-[10px] font-bold text-blue-400">$</span>
+						</div>
+						<div>
+							<p className="text-[10px] text-gray-500 uppercase tracking-wider">
+								USDC Balance
+							</p>
+							<p className="text-sm font-bold text-white">
+								{loading ? "…" : `$${fmt7(usdcBalance, 2)}`}
+							</p>
+						</div>
+					</div>
+					<div className="rounded-xl bg-gray-800/50 px-4 py-3 flex items-center gap-3">
+						<div className="w-8 h-8 rounded-full bg-indigo-950/60 border border-indigo-900/40 flex items-center justify-center shrink-0">
+							<span className="text-[10px] font-bold text-indigo-400">v$</span>
+						</div>
+						<div>
+							<p className="text-[10px] text-gray-500 uppercase tracking-wider">
+								vUSDC Balance
+							</p>
+							<p className="text-sm font-bold text-white">
+								{loading ? "…" : fmt7(vusdcBalance, 2)}
+							</p>
+						</div>
+					</div>
+					<div className="rounded-xl bg-gray-800/50 px-4 py-3 flex items-center gap-3">
+						<div className="w-8 h-8 rounded-full bg-gray-700/60 border border-gray-600/40 flex items-center justify-center shrink-0">
+							<span className="text-[10px] font-bold text-gray-300">XLM</span>
+						</div>
+						<div>
+							<p className="text-[10px] text-gray-500 uppercase tracking-wider">
+								XLM Balance
+							</p>
+							<p className="text-sm font-bold text-white">
+								{loading ? "…" : fmt7(xlmBalance, 2)}
+							</p>
+						</div>
 					</div>
 				</div>
 			</div>

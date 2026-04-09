@@ -25,12 +25,16 @@ function getServer(): rpc.Server {
 	return _server
 }
 
+// A valid testnet account used as a dummy source for read-only simulations.
+// (USDC issuer on testnet — known to exist and has a valid checksum)
+const DUMMY_SOURCE = "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5"
+
 /** Simulate a read-only contract call and return the native JS value */
 export async function readContract<T = unknown>(
 	contractId: string,
 	method: string,
 	args: xdr.ScVal[] = [],
-	sourceAccount = "GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN",
+	sourceAccount = DUMMY_SOURCE,
 ): Promise<T> {
 	const server = getServer()
 	const account = await server.getAccount(sourceAccount).catch(
@@ -105,7 +109,7 @@ export async function buildContractTx(
 		networkPassphrase: NETWORK.passphrase,
 	})
 		.addOperation(contract.call(method, ...args))
-		.setTimeout(30)
+		.setTimeout(300)
 		.build()
 
 	const sim = await server.simulateTransaction(tx)

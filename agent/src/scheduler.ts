@@ -32,7 +32,8 @@ export async function runScheduler(
 		agentUsdcBalance: 0n,
 		agentBudget: 0n,
 		lastScan: 0,
-		ledgerSinceHeartbeat: 999,
+		lastAuctionScan: 0,
+		lastHeartbeatLedger: 0,
 		currentLedger: 0,
 		placedBidAuctionIds: new Set(),
 	}
@@ -42,6 +43,8 @@ export async function runScheduler(
 			`${allActions.length} actions loaded)`,
 	)
 
+	let consecutiveErrors = 0
+
 	while (true) {
 		try {
 			state.currentLedger = await getCurrentLedger()
@@ -49,6 +52,8 @@ export async function runScheduler(
 				keypair.publicKey(),
 				"USDC",
 			)
+			state.agentBudget = state.agentUsdcBalance
+			consecutiveErrors = 0
 
 			const eligible = allActions.filter((a) => {
 				try {
@@ -65,7 +70,23 @@ export async function runScheduler(
 				)
 				await action.execute(state)
 			}
-		} catch (err) {
+		} catch (err: any) {
+			consecutiveErrors++
+			const isNetworkError =
+				err?.code === "ENOTFOUND" ||
+				err?.code === "ECONNREFUSED" ||
+				err?.code === "ETIMEDOUT"
+			if (isNetworkError) {
+				const backoffMs = Math.min(
+					30_000,
+					CONFIG.agent.loopIntervalMs * 2 ** Math.min(consecutiveErrors - 1, 4),
+				)
+				console.warn(
+					`[scheduler] network unreachable (attempt ${consecutiveErrors}), retrying in ${backoffMs / 1000}s`,
+				)
+				await sleep(backoffMs)
+				continue
+			}
 			console.error("[scheduler] error:", err)
 		}
 
