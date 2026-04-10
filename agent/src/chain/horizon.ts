@@ -1,7 +1,9 @@
-import { Horizon } from "@stellar/stellar-sdk"
+import { Asset, Horizon } from "@stellar/stellar-sdk"
 import { CONFIG } from "../config.js"
 
 const horizon = new Horizon.Server(CONFIG.network.horizonUrl)
+
+const USDC_ISSUER = "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5"
 
 const ASSET_PAIRS: Record<string, { base: string; counter: string }> = {
 	XLM: { base: "native", counter: "USDC" },
@@ -22,14 +24,16 @@ export async function computeTWAP(
 	const pair = ASSET_PAIRS[asset]
 	if (!pair) throw new Error(`Unknown asset: ${asset}`)
 
+	const baseAsset =
+		pair.base === "native" ? Asset.native() : new Asset(pair.base, "") // SBTC issuer unknown, fallback to empty (will fail if used)
+
+	const usdcAsset = new Asset("USDC", USDC_ISSUER)
+
 	try {
 		const trades = await horizon
 			.tradeAggregation(
-				// @ts-ignore — stellar-sdk types for native asset
-				pair.base === "native"
-					? { type: "native" }
-					: { type: "credit_alphanum4", code: pair.base, issuer: "" },
-				{ type: "credit_alphanum4", code: "USDC", issuer: "" },
+				baseAsset,
+				usdcAsset,
 				startTime,
 				endTime,
 				60_000, // 1-minute resolution
@@ -84,7 +88,7 @@ export async function getAccountBalance(
 /** Testnet fallback mock prices (scaled 1e7) */
 function getMockPrice(asset: string): bigint {
 	const mocks: Record<string, bigint> = {
-		XLM: 1_100_000n, // $0.11
+		XLM: 800_000n, // $0.08 (demo: below liquidation threshold for typical positions)
 		SBTC: 960_000_000n, // $96,000 (micro-sBTC)
 	}
 	return mocks[asset] ?? 1_000_000n

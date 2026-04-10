@@ -7,6 +7,7 @@ const inter = Inter({ variable: "--font-geist-sans", subsets: ["latin"] })
 const jetbrainsMono = JetBrains_Mono({
 	variable: "--font-geist-mono",
 	subsets: ["latin"],
+	preload: false,
 })
 
 export const metadata: Metadata = {

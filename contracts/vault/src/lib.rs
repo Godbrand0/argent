@@ -19,7 +19,7 @@ use storage::{
     set_pool_agent, set_position, set_position_count, set_reserve_fund, set_total_borrows,
     set_total_deposits, set_usdc, set_vusdc, SCALE,
 };
-use types::{Auction, AuctionState, CollateralConfig, DataKey, LimitBid, PoolAgent, Position};
+use types::{Auction, AuctionState, CollateralConfig, DataKey, LimitBid, PoolAgent, Position, MAX_BIDS_PER_AUCTION};
 
 // ---------------------------------------------------------------------------
 // vUSDC client — for mint/burn which are not part of the standard SEP-41 interface
@@ -43,11 +43,10 @@ const FEE_TIER2_MAX: u32 = 360; // 10-30 min → 0.2%
 /// Circuit breaker trips if a position is liquidatable for 60+ min (~720 ledgers)
 const CIRCUIT_BREAKER_LEDGERS: u32 = 720;
 
-/// Loan term options in ledgers (~5s/ledger). Borrower picks one.
-/// 7 days  ≈ 120_960 ledgers
-/// 14 days ≈ 241_920 ledgers
-/// 30 days ≈ 518_400 ledgers
-const LOAN_TERM_MIN: u32 = 120_960; // 7 days minimum
+/// Loan term minimum in ledgers (~5s/ledger).
+/// Testnet: 60 ledgers (~5 min) so maturity-based liquidations can be demoed.
+/// Mainnet would use 120_960 (7 days).
+const LOAN_TERM_MIN: u32 = 60;
 
 // ---------------------------------------------------------------------------
 // Contract
@@ -317,6 +316,7 @@ impl VaultContract {
 
         let mut pos = get_position(&env, position_id).expect("position not found");
         assert!(pos.owner == user, "not position owner");
+        assert!(pos.auction_state == AuctionState::None, "position in auction: cannot repay while auction is active");
 
         let current_debt = Self::current_debt(&env, &pos);
         let repay_amount = amount.min(current_debt);
@@ -337,9 +337,6 @@ impl VaultContract {
             pos.due_at_ledger = 0;
             pos.loan_term_ledgers = 0;
             pos.became_liquidatable_at = 0;
-            if pos.auction_state == AuctionState::Active {
-                pos.auction_state = AuctionState::None;
-            }
         }
 
         set_position(&env, position_id, &pos);
@@ -450,8 +447,9 @@ impl VaultContract {
         assert!(is_registered_agent(&env, &agent), "agent not in pool");
         assert!(max_price > 0, "max_price must be positive");
 
-        let auction = get_auction(&env, auction_id).expect("auction not found");
+        let mut auction = get_auction(&env, auction_id).expect("auction not found");
         assert!(!auction.settled, "auction already settled");
+        assert!(auction.declared_winner.is_none(), "bid limit reached, winner already declared");
 
         // Block the trigger agent from bidding on their own auction
         assert!(
@@ -475,17 +473,50 @@ impl VaultContract {
             active: true,
         });
         set_auction_bids(&env, auction_id, &bids);
-        bump_instance(&env);
 
         env.events().publish(
             (Symbol::new(&env, "limit_bid_placed"),),
-            (agent, auction_id, max_price),
+            (agent.clone(), auction_id, max_price),
         );
+
+        // Count active bids — declare a winner when the limit is reached.
+        let active_count = bids.iter().filter(|b| b.active).count() as u32;
+        if active_count >= MAX_BIDS_PER_AUCTION {
+            // Pick the active bid with the highest max_price.
+            let mut winner_addr: Option<Address> = None;
+            let mut winner_price: i128 = 0;
+            for i in 0..bids.len() {
+                let bid = bids.get(i).unwrap();
+                if bid.active && bid.max_price > winner_price {
+                    winner_price = bid.max_price;
+                    winner_addr = Some(bid.agent.clone());
+                }
+            }
+            if let Some(ref w) = winner_addr {
+                auction.declared_winner = winner_addr.clone();
+                set_auction(&env, auction_id, &auction);
+                env.events().publish(
+                    (Symbol::new(&env, "winner_declared"),),
+                    (auction_id, w.clone(), winner_price),
+                );
+            }
+        }
+
+        bump_instance(&env);
     }
 
     /// Cancel a previously placed limit bid on an auction.
+    /// Blocked if the auction's declared winner has already been set — the
+    /// winner must settle, not escape.
     pub fn cancel_limit_bid(env: Env, agent: Address, auction_id: u64) {
         agent.require_auth();
+
+        let auction = get_auction(&env, auction_id).expect("auction not found");
+        assert!(!auction.settled, "auction already settled");
+        // Declared winner cannot cancel — they must settle to release the position.
+        if let Some(ref winner) = auction.declared_winner {
+            assert!(winner != &agent, "declared winner cannot cancel bid");
+        }
 
         let mut bids = get_auction_bids(&env, auction_id);
         let mut found = false;
@@ -512,11 +543,12 @@ impl VaultContract {
 
     /// Settle an auction by picking the best fillable limit bid.
     ///
-    /// Anyone can call this. The contract finds the active bid with the highest
-    /// max_price that is >= the current Dutch price, and settles with them.
-    /// The winning agent pays the current Dutch price (not their max_price),
-    /// so agents are rewarded for placing higher bids without paying more.
-    pub fn settle_auction(env: Env, auction_id: u64) {
+    /// The caller must be the winning bidder — the agent with the highest
+    /// max_price bid >= current Dutch price. They provide auth so the contract
+    /// can pull their USDC for settlement.
+    /// The winner pays the current Dutch price (not their max_price).
+    pub fn settle_auction(env: Env, auction_id: u64, winner: Address) {
+        winner.require_auth();
         accrue_interest(&env);
 
         let mut auction = get_auction(&env, auction_id).expect("auction not found");
@@ -537,10 +569,18 @@ impl VaultContract {
             }
         }
 
-        let idx = best_idx.expect("no fillable bid at current price");
-        let winning_bid = bids.get(idx).unwrap();
-        let winner = winning_bid.agent.clone();
-        let settlement_price = current_price; // winner pays Dutch price, not their max
+        // If a winner was declared (bid limit reached), enforce it.
+        // Otherwise fall back to best-bid selection (Dutch price threshold path).
+        let settlement_price = if let Some(ref declared) = auction.declared_winner {
+            assert!(winner == *declared, "caller is not the declared winner");
+            // Declared winner pays the Dutch price at the time they settle, not their max_price.
+            current_price
+        } else {
+            let idx = best_idx.expect("no fillable bid at current price");
+            let winning_bid = bids.get(idx).unwrap();
+            assert!(winning_bid.agent == winner, "caller is not the winning bidder");
+            current_price
+        };
 
         let mut pos = get_position(&env, auction.position_id).expect("position not found");
         let current_debt = Self::current_debt(&env, &pos);
@@ -679,6 +719,7 @@ impl VaultContract {
             started_at_ledger: current_ledger,
             trigger_agent: caller.clone(),
             settled: false,
+            declared_winner: None,
         };
         set_auction(&env, auction_id, &auction);
         set_auction_count(&env, auction_id + 1);

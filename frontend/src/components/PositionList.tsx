@@ -7,7 +7,7 @@ import { fmt7, hfColor, hfBarPct, SCALE } from "@/lib/config"
 import { type Position } from "@/lib/vault"
 
 // XLM/USDC mock price for HF display
-const MOCK_XLM_PRICE = 1_100_000n
+const MOCK_XLM_PRICE = 800_000n
 
 function computeHF(pos: Position): bigint {
 	if (pos.debt_principal === 0n) return 999n * SCALE
@@ -16,11 +16,17 @@ function computeHF(pos: Position): bigint {
 	return (colVal * LIQ_THRESHOLD) / pos.debt_principal
 }
 
-function StatusBadge({ state }: { state: string }) {
-	if (state === "None") return null
+function enumTag(val: string[] | string): string {
+	if (Array.isArray(val)) return val[0] ?? "None"
+	return val
+}
+
+function StatusBadge({ state }: { state: string[] | string }) {
+	const tag = enumTag(state)
+	if (tag === "None") return null
 	return (
 		<span className="px-2 py-0.5 rounded text-[10px] uppercase font-bold bg-orange-500/20 text-orange-400 border border-orange-500/30">
-			Auction {state}
+			Auction {tag}
 		</span>
 	)
 }
@@ -55,7 +61,7 @@ function PositionCard({ id, pos }: { id: bigint; pos: Position }) {
 							<CopyButton value={pos.owner} />
 						</div>
 					</div>
-					<StatusBadge state={pos.auction_state.tag} />
+					<StatusBadge state={pos.auction_state} />
 				</div>
 
 				<div className="grid grid-cols-2 gap-4 border-t border-gray-800/50 pt-4">

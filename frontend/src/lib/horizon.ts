@@ -2,7 +2,7 @@
 import { Horizon } from "@stellar/stellar-sdk"
 import { NETWORK, SCALE_N } from "./config"
 
-const horizon = new Horizon.Server(NETWORK.horizonUrl, { timeout: 8000 })
+const horizon = new Horizon.Server(NETWORK.horizonUrl)
 
 // Circle testnet USDC issuer
 const USDC_ISSUER = "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5"

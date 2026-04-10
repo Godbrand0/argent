@@ -8,8 +8,16 @@ export const CONFIG = {
 			process.env.NETWORK_PASSPHRASE ?? "Test SDF Network ; September 2015",
 	},
 	contracts: {
-		vault: process.env.VAULT_CONTRACT_ID ?? "",
-		vusdc: process.env.VUSDC_CONTRACT_ID ?? "",
+		vault:
+			process.env.VAULT_CONTRACT_ID ??
+			(() => {
+				throw new Error("VAULT_CONTRACT_ID not set")
+			})(),
+		vusdc:
+			process.env.VUSDC_CONTRACT_ID ??
+			(() => {
+				throw new Error("VUSDC_CONTRACT_ID not set")
+			})(),
 		// Native XLM Stellar Asset Contract — used as collateral
 		xlmSac:
 			process.env.XLM_SAC_CONTRACT_ID ??
@@ -48,6 +56,18 @@ export const CONFIG = {
 		 * Useful when running pool agents with capped budgets.
 		 */
 		maxBidUsdc: parseInt(process.env.MAX_BID_USDC ?? "0"),
+	},
+	x402: {
+		/**
+		 * Base URL of the LiquidMind x402 intelligence server.
+		 * Agent will pay for /opportunities and /auctions data instead of scanning the chain directly.
+		 */
+		serverUrl: process.env.X402_SERVER_URL ?? "http://localhost:4000",
+		/**
+		 * Stellar address that receives USDC payments for gated endpoints.
+		 * Must match SERVER_PAYMENT_ADDRESS in the server .env.
+		 */
+		serverPaymentAddress: process.env.X402_SERVER_PAYMENT_ADDRESS ?? "",
 	},
 	zk: {
 		hfWasmPath:

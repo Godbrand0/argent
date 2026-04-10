@@ -5,15 +5,19 @@ import { getAccountBalance } from "./chain/horizon.js"
 import { getCurrentLedger } from "./chain/soroban.js"
 import { CONFIG } from "./config.js"
 import { type Action, type AgentState } from "./types.js"
+import { type X402Client } from "./x402.js"
 
 export type AgentRole = "monitor" | "bidder" | "both"
 
 export async function runScheduler(
 	keypair: Keypair,
 	role: AgentRole = "both",
+	x402: X402Client,
 ): Promise<never> {
-	const monitorActions = role !== "bidder" ? buildMonitorActions(keypair) : []
-	const bidderActions = role !== "monitor" ? buildBidderActions(keypair) : []
+	const monitorActions =
+		role !== "bidder" ? buildMonitorActions(keypair, x402) : []
+	const bidderActions =
+		role !== "monitor" ? buildBidderActions(keypair, x402) : []
 
 	const allActions: Action[] = [...monitorActions, ...bidderActions].sort(
 		(a, b) => b.priority - a.priority,

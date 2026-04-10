@@ -50,6 +50,13 @@ impl VUsdcContract {
         env.storage().instance().set(&DataKey::TotalSupply, &0i128);
     }
 
+    /// Update the vault address. Admin only — called after a vault redeploy.
+    pub fn set_vault(env: Env, new_vault: Address) {
+        let admin: Address = env.storage().instance().get(&DataKey::Admin).unwrap();
+        admin.require_auth();
+        env.storage().instance().set(&DataKey::Vault, &new_vault);
+    }
+
     // -----------------------------------------------------------------------
     // SEP-41 token interface
     // -----------------------------------------------------------------------

@@ -127,7 +127,7 @@ function BorrowPanel({
 	)
 	const effectivePositionId =
 		myPositions.length === 1 ? myPositions[0][0].toString() : positionId
-	const [price, setPrice] = useState("0.11")
+	const price = "1.00" // Fixed protocol price — do not change
 	const [loanTerm, setLoanTerm] = useState(120_960) // default 7 days
 	const [loading, setLoading] = useState(false)
 	const [txHash, setTxHash] = useState<string | null>(null)
@@ -230,24 +230,13 @@ function BorrowPanel({
 			{tab === "borrow" && (
 				<>
 					<div>
-						<label className="block text-xs text-gray-400 mb-1">
-							XLM/USDC Price (for HF check)
-						</label>
-						<input
-							type="number"
-							step="0.001"
-							value={price}
-							onChange={(e) => setPrice(e.target.value)}
-							className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
-						/>
-					</div>
-					<div>
 						<label className="block text-xs text-gray-400 mb-2">
 							Loan Term
 						</label>
-						<div className="grid grid-cols-3 gap-2">
+						<div className="grid grid-cols-4 gap-2">
 							{(
 								[
+									{ label: "5 min ⚡", ledgers: 60 },
 									{ label: "7 days", ledgers: 120_960 },
 									{ label: "14 days", ledgers: 241_920 },
 									{ label: "30 days", ledgers: 518_400 },

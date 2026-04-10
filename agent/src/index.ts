@@ -139,7 +139,7 @@ async function main() {
 	// 2. Register in the pool before starting the action loop
 	await ensureRegistered(keypair)
 
-	await runScheduler(keypair, CONFIG.agent.role)
+	await runScheduler(keypair, CONFIG.agent.role, x402)
 }
 
 main().catch((err) => {

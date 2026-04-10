@@ -58,10 +58,11 @@ app.get("/pool", async (req, res) => {
  */
 app.get("/opportunities", async (req, res) => {
 	try {
-		const opportunities = await VaultReader.getAtRiskPositions(VAULT_ID!)
+		const result = await VaultReader.getAtRiskPositions(VAULT_ID!)
 		res.json({
-			count: opportunities.length,
-			opportunities,
+			count: result.positions.length,
+			opportunities: result.positions,
+			xlmPrice: result.xlmPrice,
 		})
 	} catch (error) {
 		res.status(500).json({ error: "Failed to fetch opportunities" })

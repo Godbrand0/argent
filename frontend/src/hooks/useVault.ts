@@ -1,15 +1,16 @@
 "use client"
 import { useState, useEffect, useCallback } from "react"
-import { CONTRACTS } from "@/lib/config"
-import { MOCK_POSITIONS, MOCK_AUCTIONS, MOCK_PRICES } from "@/lib/mock_data"
 import {
 	getPoolStats,
 	getAllPositions,
 	getAllActiveAuctions,
+	getAllSettledAuctions,
 	getCurrentAuctionPrice,
+	getAuctionBids,
 	type PoolStats,
 	type Position,
 	type Auction,
+	type LimitBid,
 } from "@/lib/vault"
 
 const POLL_MS = 5000
@@ -19,11 +20,10 @@ export function usePoolStats() {
 	const [loading, setLoading] = useState(true)
 
 	const refresh = useCallback(async () => {
-		if (!CONTRACTS.vault) return
 		try {
 			setStats(await getPoolStats())
 		} catch {
-			/* rpc not configured yet */
+			/* rpc error */
 		} finally {
 			setLoading(false)
 		}
@@ -45,19 +45,12 @@ export function usePositions() {
 	const [loading, setLoading] = useState(true)
 
 	const refresh = useCallback(async () => {
-		if (!CONTRACTS.vault) {
-			setPositions(MOCK_POSITIONS)
-			setLoading(false)
-			return
-		}
 		try {
 			const stats = await getPoolStats()
 			const pos = await getAllPositions(stats.positionCount)
-			// Fallback to mock data if empty
-			setPositions(pos.length > 0 ? pos : MOCK_POSITIONS)
+			setPositions(pos)
 		} catch {
-			// Fallback to mock data on error/missing config
-			setPositions(MOCK_POSITIONS)
+			setPositions([])
 		} finally {
 			setLoading(false)
 		}
@@ -77,37 +70,33 @@ export function usePositions() {
 export function useAuctions() {
 	const [auctions, setAuctions] = useState<[bigint, Auction][]>([])
 	const [prices, setPrices] = useState<Record<string, bigint>>({})
+	const [bids, setBids] = useState<Record<string, LimitBid[]>>({})
 	const [loading, setLoading] = useState(true)
 
 	const refresh = useCallback(async () => {
-		if (!CONTRACTS.vault) {
-			setAuctions(MOCK_AUCTIONS)
-			setPrices(MOCK_PRICES)
-			setLoading(false)
-			return
-		}
 		try {
 			const stats = await getPoolStats()
 			const active = await getAllActiveAuctions(stats.auctionCount)
+			setAuctions(active)
 
-			if (active.length > 0) {
-				setAuctions(active)
-				const priceMap: Record<string, bigint> = {}
-				await Promise.all(
-					active.map(async ([id]) => {
-						try {
-							priceMap[id.toString()] = await getCurrentAuctionPrice(id)
-						} catch {}
-					}),
-				)
-				setPrices(priceMap)
-			} else {
-				setAuctions(MOCK_AUCTIONS)
-				setPrices(MOCK_PRICES)
-			}
+			const priceMap: Record<string, bigint> = {}
+			const bidsMap: Record<string, LimitBid[]> = {}
+			await Promise.all(
+				active.map(async ([id]) => {
+					try {
+						priceMap[id.toString()] = await getCurrentAuctionPrice(id)
+					} catch {}
+					try {
+						bidsMap[id.toString()] = await getAuctionBids(id)
+					} catch {}
+				}),
+			)
+			setPrices(priceMap)
+			setBids(bidsMap)
 		} catch {
-			setAuctions(MOCK_AUCTIONS)
-			setPrices(MOCK_PRICES)
+			setAuctions([])
+			setPrices({})
+			setBids({})
 		} finally {
 			setLoading(false)
 		}
@@ -121,5 +110,42 @@ export function useAuctions() {
 		return () => clearInterval(t)
 	}, [refresh])
 
-	return { auctions, prices, loading, refresh }
+	return { auctions, prices, bids, loading, refresh }
+}
+
+export function useSettledAuctions() {
+	const [auctions, setAuctions] = useState<[bigint, Auction][]>([])
+	const [bids, setBids] = useState<Record<string, LimitBid[]>>({})
+	const [loading, setLoading] = useState(true)
+
+	const refresh = useCallback(async () => {
+		try {
+			const stats = await getPoolStats()
+			const settled = await getAllSettledAuctions(stats.auctionCount)
+			setAuctions(settled)
+
+			const bidsMap: Record<string, LimitBid[]> = {}
+			await Promise.all(
+				settled.map(async ([id]) => {
+					try {
+						bidsMap[id.toString()] = await getAuctionBids(id)
+					} catch {}
+				}),
+			)
+			setBids(bidsMap)
+		} catch {
+			setAuctions([])
+			setBids({})
+		} finally {
+			setLoading(false)
+		}
+	}, [])
+
+	useEffect(() => {
+		void refresh()
+		const t = setInterval(() => void refresh(), POLL_MS)
+		return () => clearInterval(t)
+	}, [refresh])
+
+	return { auctions, bids, loading, refresh }
 }

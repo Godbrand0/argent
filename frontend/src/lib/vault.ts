@@ -4,7 +4,7 @@ import { CONTRACTS } from "./config"
 import { readContract, buildContractTx } from "./soroban"
 
 export interface Position {
-	auction_state: { tag: string }
+	auction_state: string[] | string
 	became_liquidatable_at: number
 	borrow_index_at_open: bigint
 	collateral_amount: bigint
@@ -22,6 +22,14 @@ export interface Auction {
 	start_price: bigint
 	started_at_ledger: number
 	trigger_agent: string
+	declared_winner: string | null
+}
+
+export interface LimitBid {
+	agent: string
+	max_price: bigint
+	placed_at_ledger: number
+	active: boolean
 }
 
 export interface PoolStats {
@@ -98,6 +106,15 @@ export async function getCurrentAuctionPrice(
 	])
 }
 
+export async function getAuctionBids(auctionId: bigint): Promise<LimitBid[]> {
+	const result = await readContract<LimitBid[]>(
+		CONTRACTS.vault,
+		"get_auction_bids",
+		[nativeToScVal(auctionId, { type: "u64" })],
+	)
+	return result ?? []
+}
+
 export async function getHeartbeat(): Promise<number> {
 	return readContract<number>(CONTRACTS.vault, "get_heartbeat")
 }
@@ -150,6 +167,22 @@ export async function getAllActiveAuctions(
 		try {
 			const a = await getAuction(i)
 			if (!a.settled) results.push([i, a])
+		} catch {
+			/* not found */
+		}
+	}
+	return results
+}
+
+export async function getAllSettledAuctions(
+	count: bigint,
+): Promise<[bigint, Auction][]> {
+	const limit = count < 20n ? count : 20n
+	const results: [bigint, Auction][] = []
+	for (let i = 0n; i < limit; i++) {
+		try {
+			const a = await getAuction(i)
+			if (a.settled) results.push([i, a])
 		} catch {
 			/* not found */
 		}

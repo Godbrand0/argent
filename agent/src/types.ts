@@ -22,12 +22,16 @@ export interface Position {
 export interface Auction {
 	id: bigint
 	positionId: bigint
+	collateralAsset: string
+	collateralAmount: bigint
 	startPrice: bigint
 	floorPrice: bigint
 	decayRatePerLedger: bigint
 	startedAtLedger: number
 	triggerAgent: string
 	settled: boolean
+	/** Set when MAX_BIDS_PER_AUCTION bids are placed — only this agent may settle. */
+	declaredWinner: string | null
 }
 
 export interface PoolAgent {

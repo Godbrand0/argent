@@ -10,12 +10,8 @@ export const NETWORK = {
 }
 
 export const CONTRACTS = {
-	vault:
-		process.env.NEXT_PUBLIC_VAULT_CONTRACT_ID ??
-		"CCY5BGSRZXDC47LB26HDXRLQSMGSUIUQA7X3E6NBN67FJIODPAE342VW",
-	vusdc:
-		process.env.NEXT_PUBLIC_VUSDC_CONTRACT_ID ??
-		"CAOGZL6VTMXQOAWPGSAHYASB666ADCM3G262JHDMPPC2Y7C3NKTJ2BWP",
+	vault: process.env.NEXT_PUBLIC_VAULT_CONTRACT_ID ?? "",
+	vusdc: process.env.NEXT_PUBLIC_VUSDC_CONTRACT_ID ?? "",
 	// Native XLM Stellar Asset Contract — deposited as collateral to borrow USDC
 	xlmSac:
 		process.env.NEXT_PUBLIC_XLM_SAC_CONTRACT_ID ??

@@ -1,9 +1,12 @@
 import {
+	Address,
+	authorizeEntry,
 	Contract,
 	type Keypair,
 	Networks,
 	rpc,
-	Transaction,
+	scValToNative,
+	type Transaction,
 	TransactionBuilder,
 	BASE_FEE,
 	xdr,
@@ -39,8 +42,84 @@ export async function invokeContract(
 	if (rpc.Api.isSimulationError(simResult)) {
 		throw new Error(`Simulation failed: ${simResult.error}`)
 	}
+	if ((simResult as any).error) {
+		throw new Error(`Simulation failed: ${(simResult as any).error}`)
+	}
 
-	const preparedTx = rpc.assembleTransaction(tx, simResult).build()
+	// Build the transaction with the simulation's Soroban footprint + auth entries.
+	// Soroban simulation does NOT enforce auth signatures; real execution does.
+	// Nested calls inside a contract (e.g. token.transfer(winner, ...)) generate
+	// SOROBAN_CREDENTIALS_ADDRESS auth entries that must be explicitly signed with
+	// authorizeEntry — they are NOT covered by the outer transaction signature alone.
+	let preparedTx = rpc.assembleTransaction(tx, simResult).build()
+
+	const txEnv = xdr.TransactionEnvelope.fromXDR(preparedTx.toXDR(), "base64")
+	const authList = txEnv
+		.v1()
+		.tx()
+		.operations()[0]
+		.body()
+		.invokeHostFunctionOp()
+		.auth()
+
+	if (
+		authList.some(
+			(e) => e.credentials().switch().name === "sorobanCredentialsAddress",
+		)
+	) {
+		// Convert any sorobanCredentialsAddress entry for the tx source to
+		// sorobanCredentialsSourceAccount. This prevents auth failures when
+		// contract sub-invocations (e.g. token.transfer inside settle_auction)
+		// use a dynamic amount that differs between simulation and execution
+		// ledgers (Dutch auction price decay). SourceAccount auth is blanket
+		// and does not check exact invocation arguments.
+		const sourceKey = keypair.publicKey()
+		const convertedAuth = authList.map((entry) => {
+			if (entry.credentials().switch().name !== "sorobanCredentialsAddress")
+				return entry
+			try {
+				const scAddr = entry.credentials().address().address()
+				if (Address.fromScAddress(scAddr).toString() === sourceKey) {
+					return new xdr.SorobanAuthorizationEntry({
+						credentials:
+							xdr.SorobanCredentials.sorobanCredentialsSourceAccount(),
+						rootInvocation: entry.rootInvocation(),
+					})
+				}
+			} catch {
+				// not an account address — keep as-is
+			}
+			return entry
+		})
+
+		// Sign any remaining sorobanCredentialsAddress entries (non-source accounts)
+		const latestLedger = await server.getLatestLedger()
+		const validUntilLedger = latestLedger.sequence + 100
+		const signedAuth = await Promise.all(
+			convertedAuth.map((entry) =>
+				entry.credentials().switch().name === "sorobanCredentialsAddress"
+					? authorizeEntry(
+							entry,
+							keypair,
+							validUntilLedger,
+							CONFIG.network.networkPassphrase,
+						)
+					: Promise.resolve(entry),
+			),
+		)
+		txEnv
+			.v1()
+			.tx()
+			.operations()[0]
+			.body()
+			.invokeHostFunctionOp()
+			.auth(signedAuth)
+		preparedTx = TransactionBuilder.fromXDR(
+			txEnv.toXDR("base64"),
+			CONFIG.network.networkPassphrase,
+		) as Transaction
+	}
+
 	preparedTx.sign(keypair)
 
 	const sendResult = await server.sendTransaction(preparedTx)
@@ -61,7 +140,40 @@ export async function invokeContract(
 	}
 
 	if (getResult.status !== rpc.Api.GetTransactionStatus.SUCCESS) {
-		throw new Error(`Transaction failed: ${getResult.status}`)
+		let detail = ""
+		try {
+			const resultXdr = (getResult as any).resultXdr as
+				| xdr.TransactionResult
+				| undefined
+			if (resultXdr) {
+				const txCode = resultXdr.result().switch().name
+				const opResults = resultXdr.result().results?.() ?? []
+				const opCode = opResults[0]
+					?.tr?.()
+					?.invokeHostFunctionResult?.()
+					?.switch?.()?.name
+				detail = ` [${txCode}${opCode ? ` / ${opCode}` : ""}]`
+			}
+		} catch {
+			/* ignore XDR decode errors */
+		}
+
+		// Extract diagnostic events (contract panic messages)
+		try {
+			const events: any[] =
+				(getResult as any).resultMetaXdr
+					?.v3?.()
+					?.sorobanMeta?.()
+					?.diagnosticEvents?.() ?? []
+			for (const ev of events) {
+				try {
+					const native = scValToNative(ev.event().body().v0().data())
+					detail += ` | diag: ${JSON.stringify(native)}`
+				} catch {}
+			}
+		} catch {}
+
+		throw new Error(`Transaction failed: ${getResult.status}${detail}`)
 	}
 
 	return getResult.returnValue ?? xdr.ScVal.scvVoid()

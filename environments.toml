@@ -63,7 +63,7 @@ reset
 # meaning that their data will match the live network at the given sequence number.
 # [development.contracts.eurc]
 # environment = "production"
-# address = "C..."
+# address = "CBX3RYKVDKNRHGVCQ6KW3INDJV2E5QFSZMDPPF26TWDZXWSI6MEB6QOF"
 # at-ledger-sequence = 50153603
 
 ### Staging environment configuration

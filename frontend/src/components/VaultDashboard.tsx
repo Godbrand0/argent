@@ -29,7 +29,7 @@ export function VaultDashboard() {
 	const atRisk = positions.filter(([, pos]) => {
 		if (pos.debt_principal === 0n) return false
 		const LIQ_THRESHOLD = 8_000_000n
-		const MOCK_XLM_PRICE = 1_100_000n
+		const MOCK_XLM_PRICE = 800_000n
 		const colVal = (pos.collateral_amount * MOCK_XLM_PRICE) / SCALE
 		const hf = (colVal * LIQ_THRESHOLD) / pos.debt_principal
 		return hf < SCALE

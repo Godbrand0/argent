@@ -73,6 +73,10 @@ pub struct Position {
     pub became_liquidatable_at: u32,
 }
 
+/// Maximum number of limit bids allowed per auction.
+/// When this limit is reached the winner is declared immediately.
+pub const MAX_BIDS_PER_AUCTION: u32 = 3;
+
 #[derive(Clone, Debug)]
 #[contracttype]
 pub struct Auction {
@@ -86,6 +90,9 @@ pub struct Auction {
     pub started_at_ledger: u32,
     pub trigger_agent: Address,
     pub settled: bool,
+    /// Set when the bid limit is reached — the agent with the highest max_price.
+    /// Once declared, only this agent may call settle_auction.
+    pub declared_winner: Option<Address>,
 }
 
 #[derive(Clone, Debug)]
