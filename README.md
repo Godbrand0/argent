@@ -1,133 +1,157 @@
-# LiquidMind: Agentic Liquidation Protocol
+# Argen: Agentic Liquidation Protocol
 
-LiquidMind is an autonomous lending protocol on Stellar that leverages ZK-Proofs
-and x402 payments to enable a self-sustaining agentic economy.
-
-## Protocol Lifecycle
-
-The end-to-end flow of LiquidMind is distributed across the Frontend, Backend
-(Agents), and Soroban Smart Contracts.
-
-### 1. The Core Lifecycle: Borrowing & Collateral
-
-- **User Action (Frontend):** A user connects their wallet and deposits XLM as
-  collateral to borrow USDC.
-- **The Engine (Contract):** The **Vault Contract (Soroban)** records the debt,
-  issues `vUSDC` (yield-bearing), and tracks the "Health Factor."
-
-### 2. The Watchtower: Health Monitoring
-
-- **The Scout (Backend - Agent):** An autonomous **Monitor Agent** runs in a
-  continuous loop. It scans all open positions on the vault contract using RPC
-  calls.
-- **ZK-Proof Generation (Backend):** Instead of the contract doing heavy math,
-  the Agent generates a **ZK Health-Factor Proof** locally. This proves a
-  position is undercollateralized without the contract needing to fetch external
-  price feeds directly.
-
-### 3. The Marketplace: x402 Data API
-
-- **Gated Discovery (Backend - Server):** The server hosts the **x402 Agentic
-  API**.
-- **The Economy:** External agents pay for high-alpha liquidation data.
-  1.  **Challenge:** External client calls `GET /opportunities`. Server returns
-      `402 Payment Required`.
-  2.  **Payment:** Client pays **0.05 USDC** via Stellar to your wallet.
-  3.  **Data:** Server verifies payment via the OpenZeppelin Facilitator and
-      serves the list of at-risk positions.
-- **Impact:** You monetize your protocol’s monitoring intelligence.
-
-### 4. The Trigger: Automatic Liquidation
-
-- **Action (Backend - Agent):** When an agent identifies a bad position, it
-  calls `trigger_auction` on the contract, submitting the ZK Proof as evidence.
-- **Reward (Contract → Backend):** The contract verifies the proof. If valid, it
-  immediately pays a **1% Trigger Fee** (in USDC) to the Agent’s wallet.
-
-### 5. The Auction: Dutch Auction Bidding
-
-- **The Descent (Contract):** The contract starts a **Dutch Auction**. The price
-  of seized XLM collateral drops every second.
-- **The Bid (Backend - Agent):** A **Bidder Agent** watches the auction,
-  calculates the decaying price, and waits for a specific profit margin.
-- **The Strike:** When the price hits your `MIN_PROFIT_THRESHOLD` (e.g., 2%
-  discount), the Agent generates a **ZK Auction-Price Proof** and submits a bid
-  to claim the collateral.
+Argen is an autonomous lending protocol on Stellar that leverages **ZK-Proofs**
+and **x402 payments** to enable a self-sustaining, hyper-efficient agentic
+economy.
 
 ---
 
-## Ecosystem & Marketplace Dynamics
+## 🔗 Deployed Contracts (Stellar Testnet)
 
-LiquidMind is designed as a **Competitive Marketplace** where the protocol owner
-profits from both their own automation and third-party participation.
+You can explore our deployed smart contracts directly on stellar.expert:
 
-### 1. The External Builder (The "Alpha-Seeker")
-
-External developers can participate in the protocol's liquidation economy
-without building a full monitoring stack from scratch.
-
-- **Data Purchase:** External agents pay the protocol owner **0.05 USDC** per
-  request via the **x402 API** to receive the latest list of liquidation
-  opportunities.
-- **The Race:** Armed with this data, external agents compete on-chain to
-  trigger auctions.
-- **Win-Win:** If an external agent wins the 1% trigger fee, the protocol owner
-  still collects the API fee. The protocol turns "competitors" into "paying
-  customers."
-
-### 2. The Borrower (The "User")
-
-A normal human who borrows USDC from the protocol.
-
-- **Risk Visibility:** Users use the dashboard to monitor their **Safety
-  Score**. Tooltips provide clear explanations of liquidation thresholds.
-- **Protocol Resilience:** The presence of multiple agents (internal and
-  external) ensures that bad debt is cleared immediately, maintaining protocol
-  solvency and user trust.
-
-### 3. Crowd-Sourced Security
-
-By selling high-fidelity data via x402, LiquidMind ensures a **Self-Healing
-Financial System**. There are always "scouts" looking for bad debt, ensuring the
-protocol is never under-collateralized even during extreme market volatility.
+- **Vault:**
+  [`CBNXMW4QDJS77SRB6URZKFF4ZDAQXYLMRTLLPIJEBZYI3U3EJSPZU4BG`](https://stellar.expert/explorer/testnet/contract/CBNXMW4QDJS77SRB6URZKFF4ZDAQXYLMRTLLPIJEBZYI3U3EJSPZU4BG)
+- **vUSDC:**
+  [`CDEMATCS43COZGOQJFC5UZEA7GOY5CUQATKMFMJGKIP7B2USBS3RJ6KZ`](https://stellar.expert/explorer/testnet/contract/CDEMATCS43COZGOQJFC5UZEA7GOY5CUQATKMFMJGKIP7B2USBS3RJ6KZ)
+- **ZK Verifier:**
+  [`CDGYLCFDRHFUIGJ2A2BZ3X5BJRHVBLSEJ4DYHGRBPAYJ7YQLOVW72XR5`](https://stellar.expert/explorer/testnet/contract/CDGYLCFDRHFUIGJ2A2BZ3X5BJRHVBLSEJ4DYHGRBPAYJ7YQLOVW72XR5)
+- **USDC (Circle Testnet):**
+  [`CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA`](https://stellar.expert/explorer/testnet/contract/CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA)
+- **XLM SAC:**
+  [`CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC`](https://stellar.expert/explorer/testnet/contract/CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC)
 
 ---
 
-## Technical Stack
+## 🎯 End-to-End User Flows
 
-| Component            | Responsibility                           | Technology         |
-| :------------------- | :--------------------------------------- | :----------------- |
-| **Contract**         | Source of Truth, Debt Matching, Auctions | Soroban (Rust)     |
-| **Backend (Agent)**  | Monitoring, ZK-Proving, Bidding          | Node.js / SnarkJS  |
-| **Backend (Server)** | x402 Marketplace, API Handlers           | Express / x402     |
-| **Frontend**         | Dashboard, User Borrowing, Agent Status  | Next.js / Tailwind |
+Argen seamlessly orchestrates operations between three major user archetypes.
+
+### As a Lender 💰
+
+1. **Deposit:** Lenders connect their wallet and deposit USDC into the Argen
+   vault using the frontend.
+2. **Receive vUSDC:** They receive `vUSDC` (Vault USDC), a yield-bearing token,
+   representing their proportional share of the pool.
+3. **Earn Yield:** As borrowers pay daily interest and automated agents
+   successfully execute liquidations, the underlying USDC reserves
+   grow—constantly scaling up the redemption value of `vUSDC`.
+4. **Withdraw:** A lender can redeem their `vUSDC` tokens at any time to claim
+   back their base USDC + all algorithmic yield generated.
+
+### As a Borrower 🛡️
+
+1. **Collateralize:** Borrowers deposit native XLM into the protocol via the
+   frontend dashboard.
+2. **Borrow:** Borrowers take out a USDC loan against their XLM, locked strictly
+   down to a specific mathematical Loan-To-Value (LTV) limit.
+3. **Monitor Safety:** Borrowers use the dashboard to check their fluctuating
+   "Health Factor." If they drop below a Health Factor of `1.0` during a market
+   crash, their collateral is seized and sent to auction.
+4. **Repay:** At any point, borrowers can repay the principal loan alongside
+   accrued interest to release and retrieve their locked XLM.
+
+### As an Agent (Automation / Profit) 🤖
+
+1. **Purchase Alpha via x402:** External Agents constantly scout for bad debt by
+   calling `GET /opportunities` on the protocol's server. They receive a
+   `402 Payment Required` HTTP challenge and autonomously execute a
+   micro-payment via Stellar in real-time to access high-risk position data.
+2. **ZK Proofs & Triggering:** Once bad debt is identified, the agent creates an
+   off-chain Zero-Knowledge (ZK) Proof cryptographically proving the account is
+   strictly undercollateralized. They call `trigger_auction` on the Soroban
+   smart contract with the proof and are immediately rewarded a **1% Trigger
+   Fee**.
+3. **Dutch Auction Bidding:** Once an auction triggers, the price of the seized
+   XLM drops monotonically (Dutch Auction). External bidding agents wait until
+   their mathematically calculated `MIN_PROFIT_THRESHOLD` is hit, submitting the
+   winning transaction and claiming discounted collateral to immediately
+   arbitrage for a profit!
 
 ---
 
-## The Project Flow
+## 🆚 Argen vs. Aave: The Next Evolution of DeFi
 
-```mermaid
-graph TD
-    A[Frontend: User Borrow] -->|State Recorded| B[Contract: Vault]
-    B -->|Scan Positions| C[Backend Agent: ZK Proving]
-    C -->|Trigger Auction| B
-    C -.->|Sell Alpha| D[Backend Server: x402 API]
-    D -->|Get Data| E[External Agents]
-    B -->|Dutch Auction| F[Backend Agent: Bidder]
-    F -->|Liquidate| B
+In traditional borrowing/lending systems like **Aave**:
+
+- **Oracle Bloat:** Aave heavily relies on continuously pushing expensive, rigid
+  Oracle updates directly onto the chain so the smart contracts can calculate
+  the health factor of every single borrower recursively.
+- **Free-Rider Problem:** Multi-million dollar protocols usually host extremely
+  expensive infrastructure and free API endpoints just to allow MEV bots and
+  indexers to scout their data for free.
+
+**How Argen Changes the Game with ZK and x402:**
+
+1. **Zero-Knowledge Local Computations:** Argen explicitly offloads the heavy
+   mathematical evaluations completely off-chain. Agents individually compute
+   borrower health factors using `health_factor.wasm` proofs! The Soroban
+   contract no longer calculates prices—it strictly acts as an ultra-fast **ZK
+   Verifier**. This entirely eliminates "Oracle bloat" and saves vast amounts of
+   transaction fees on the network.
+2. **x402 Micro-Monetization:** Instead of giving away indexing and position
+   data for free via open subgraphs, Argen pioneers the `x402` payment standard.
+   It transforms the protocol into a decentralized data-marketplace,
+   fundamentally forcing AI agents and arbitrage bots to pay microscopic
+   Stellar-based fees upfront just to _read_ the data required to perform their
+   liquidations.
+3. **Crowd-Sourced Subcontracting:** We transform MEV extractors from parasitic
+   front-runners into paying customers and decentralized workers working
+   explicitly to keep the protocol seamlessly solvent!
+
+---
+
+## 🤖 The Ultimate Agent Stack: Connecting Your Own Agent
+
+Argen is built to be permissionlessly extensible. Since the entire protocol is
+driven by **x402 Payments & Agents**, external developers are highly
+incentivized to connect their own automated trading bots!
+
+### 1. Configure the Environment
+
+Clone the repository and inject the main contract hashes into your environment.
+
+```bash
+cp .env.example .env
+npm install
 ```
 
-**Flow Summary:** `Frontend (Borrow)` → `Contract (State)` →
-`Backend Agent (Proof)` → `Backend Server (Data Sale)` →
-`Contract (Auction/Settlement)`
+### 2. Autonomously Obtain Data
+
+Rather than writing an intensive indexer that scans the entire Stellar node for
+days, your agent simply hits our proprietary x402 endpoints! Utilizing our
+internally built
+[x402-flash-stellar-sdk](https://www.npmjs.com/package/x402-flash-stellar-sdk),
+your programmatic bot will intercept `402 Payment Required` responses, instantly
+sign and submit the micro-transaction via the OpenZeppelin Facilitator, and
+download the `opportunities` payload flawlessly without user intervention.
+
+### 3. Generate Native ZK Proofs Off-Chain
+
+Once your custom agent spots a target, use the `snarkjs` toolkit alongside the
+protocol's publicly distributed `.zkey` files to generate a cryptographically
+solid Proof that validates the XLM token crashed versus USDC without depending
+on any on-chain Oracles.
+
+### 4. Run & Profit
+
+Launch your Bidder or Monitor script into production:
+
+```bash
+cd agent
+# Run the internal proprietary monitor / bidder agent:
+pnpm run start:agent
+```
+
+Sit back, monitor logs, and collect completely autonomous arbitrage profits!
 
 ---
 
-## ⚡️ Getting Started
+## ⚡️ Quick Start Reference
 
 ### 1. Smart Contracts
 
-Deploy the protocol to Stellar Testnet:
+Deploy the protocol locally or to Stellar Testnet:
 
 ```bash
 sh deploy.sh
@@ -135,18 +159,15 @@ sh deploy.sh
 
 ### 2. Autonomous Agent & x402 Server
 
-Configure your `.env` with the `VAULT_CONTRACT_ID` and run:
-
 ```bash
 cd agent
-pnpm install
-pnpm run start:server   # Starts the gated x402 API
-pnpm run start:agent    # Starts the monitoring/bidding loop
+pnpm run start:server   # Starts the gated x402 protocol API!
+pnpm run start:agent    # Fire up your autonomous loops
 ```
 
 ### 3. Frontend Dashboard
 
 ```bash
-pnpm install
+cd frontend
 pnpm run dev
 ```

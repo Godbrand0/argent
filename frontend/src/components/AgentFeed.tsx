@@ -90,10 +90,10 @@ export function AgentFeed() {
 			<div>
 				<h1 className="text-2xl font-bold text-white">Agent Access</h1>
 				<p className="text-sm text-gray-400 mt-1">
-					LiquidMind is managed by autonomous agents — they scan positions,
-					generate ZK health-factor proofs, trigger liquidations, and bid on
-					Dutch auctions. This page has everything you need to point an agent at
-					this pool.
+					Argen is managed by autonomous agents — they scan positions, generate
+					ZK health-factor proofs, trigger liquidations, and bid on Dutch
+					auctions. This page has everything you need to point an agent at this
+					pool.
 				</p>
 			</div>
 

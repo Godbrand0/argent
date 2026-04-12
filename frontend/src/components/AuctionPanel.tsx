@@ -127,7 +127,7 @@ function AuctionCard({
 				<div>
 					<h3 className="text-sm font-semibold text-gray-100 flex items-center">
 						Auction #{id.toString()}
-						<InfoTooltip text="LiquidMind uses Dutch Auctions to settle defaulted debt. The price drops over time." />
+						<InfoTooltip text="Argen uses Dutch Auctions to settle defaulted debt. The price drops over time." />
 					</h3>
 					<p className="text-[11px] text-gray-500 mt-0.5">
 						Targeting Position #{auction.position_id.toString()}
@@ -207,7 +207,7 @@ function AuctionCard({
 			<div className="bg-blue-500/5 border border-blue-500/10 rounded-xl p-3">
 				<p className="text-[10px] text-blue-400 font-medium leading-relaxed">
 					Note: Manual bidding is disabled. This auction is being monitored by
-					the LiquidMind agent network.
+					the Argen agent network.
 				</p>
 			</div>
 		</div>

@@ -19,9 +19,12 @@ export function Navbar() {
 		<nav className="border-b border-gray-800 bg-gray-950/80 backdrop-blur-sm sticky top-0 z-50">
 			<div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between h-14">
 				<div className="flex items-center gap-8">
-					<span className="font-bold text-lg tracking-tight text-white">
-						Liquid<span className="text-indigo-400">Mind</span>
-					</span>
+					<div className="flex items-center gap-2">
+						<img src="/logo.png" alt="Argen Logo" className="h-6 w-auto" />
+						<span className="font-bold text-lg tracking-tight text-white">
+							Argen
+						</span>
+					</div>
 					<div className="hidden sm:flex gap-1">
 						{NAV.map((n) => (
 							<Link

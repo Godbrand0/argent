@@ -11,7 +11,7 @@ const jetbrainsMono = JetBrains_Mono({
 })
 
 export const metadata: Metadata = {
-	title: "LiquidMind",
+	title: "Argen",
 	description: "ZK-powered autonomous lending & liquidation on Stellar",
 }
 

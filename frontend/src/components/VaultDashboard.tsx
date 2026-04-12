@@ -40,7 +40,7 @@ export function VaultDashboard() {
 			<div>
 				<h1 className="text-2xl font-bold text-white">Dashboard</h1>
 				<p className="text-sm text-gray-400 mt-1">
-					Protocol-wide overview of the LiquidMind lending pool.
+					Protocol-wide overview of the Argen lending pool.
 				</p>
 			</div>
 
