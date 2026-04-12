@@ -297,6 +297,11 @@ export function AuctionPanel() {
 									.filter((b) => b.agent === winner)
 									.sort((a, b) => Number(b.max_price - a.max_price))[0]
 
+								const highestBid = [...auctionBids].sort((a, b) =>
+									Number(b.max_price - a.max_price),
+								)[0]
+								const displayBid = winnerBid || highestBid
+
 								return (
 									<div
 										key={id.toString()}
@@ -318,14 +323,14 @@ export function AuctionPanel() {
 													<CopyButton value={winner} />
 												</span>
 											</p>
-											{winnerBid && (
-												<p className="text-[10px] text-gray-500 flex justify-between items-center">
-													<span>Max Bid Placed:</span>
-													<span className="font-mono text-gray-300">
-														${fmt7(winnerBid.max_price, 2)} USDC
-													</span>
-												</p>
-											)}
+											<p className="text-[10px] text-gray-500 flex justify-between items-center">
+												<span>Max Bid Placed:</span>
+												<span className="font-mono text-gray-300">
+													{displayBid
+														? `$${fmt7(displayBid.max_price, 2)} USDC`
+														: "--"}
+												</span>
+											</p>
 										</div>
 									</div>
 								)

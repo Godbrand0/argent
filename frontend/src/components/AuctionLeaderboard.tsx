@@ -1,6 +1,7 @@
 "use client"
 import { CopyButton } from "./CopyButton"
 import { useLeaderboard } from "@/hooks/useLeaderboard"
+import { fmt7 } from "@/lib/config"
 
 function trunc(addr: string) {
 	return `${addr.slice(0, 8)}…${addr.slice(-6)}`
@@ -45,6 +46,9 @@ export function AuctionLeaderboard() {
 							<th className="px-6 py-3 text-left font-medium">Rank</th>
 							<th className="px-6 py-3 text-left font-medium">Agent Address</th>
 							<th className="px-6 py-3 text-right font-medium">Auctions Won</th>
+							<th className="px-6 py-3 text-right font-medium">
+								Total Winnings
+							</th>
 						</tr>
 					</thead>
 					<tbody className="divide-y divide-gray-800/60">
@@ -65,8 +69,16 @@ export function AuctionLeaderboard() {
 									</div>
 								</td>
 								<td className="px-6 py-3 text-right">
-									<span className="text-orange-400 font-bold text-sm">
+									<span className="text-gray-300 font-bold text-sm">
 										{entry.count}
+									</span>
+								</td>
+								<td className="px-6 py-3 text-right">
+									<span className="text-green-400 font-bold text-sm tracking-tight">
+										$
+										{entry.totalWinnings
+											? fmt7(entry.totalWinnings, 2)
+											: "0.00"}
 									</span>
 								</td>
 							</tr>

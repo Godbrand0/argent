@@ -1,41 +1,23 @@
 "use client"
 import { useState, useEffect, useCallback } from "react"
 import { CONTRACTS } from "@/lib/config"
-import { getCurrentLedger, getEvents } from "@/lib/soroban"
-import { getAllActiveAuctions, getPoolStats } from "@/lib/vault"
+import {
+	getAllActiveAuctions,
+	getAllSettledAuctions,
+	getAuctionBids,
+	getPoolStats,
+} from "@/lib/vault"
 
 export interface LeaderboardEntry {
 	address: string
 	count: number
+	totalWinnings?: bigint
 }
 
 export interface LeaderboardData {
 	liquidations: LeaderboardEntry[] // agents that triggered liquidations
 	auctionWins: LeaderboardEntry[] // agents that won auctions
 	loading: boolean
-}
-
-/** Try to extract a Stellar public key (G…, 56 chars) from any value */
-function extractStellarAddress(val: unknown): string | null {
-	if (typeof val === "string" && val.startsWith("G") && val.length === 56) {
-		return val
-	}
-	if (val && typeof val === "object") {
-		if (Array.isArray(val)) {
-			for (const item of val) {
-				const addr = extractStellarAddress(item)
-				if (addr) return addr
-			}
-		} else {
-			for (const key of Object.keys(val as object)) {
-				const addr = extractStellarAddress(
-					(val as Record<string, unknown>)[key],
-				)
-				if (addr) return addr
-			}
-		}
-	}
-	return null
 }
 
 function aggregate(addresses: string[]): LeaderboardEntry[] {
@@ -62,45 +44,62 @@ export function useLeaderboard(): LeaderboardData {
 			return
 		}
 		try {
-			// ---- Liquidation triggers ----
-			// 1. Active auctions — each has a trigger_agent
 			const stats = await getPoolStats()
-			const activeAuctions = await getAllActiveAuctions(stats.auctionCount)
-			const triggerAddrs: string[] = activeAuctions.map(
-				([, auction]) => auction.trigger_agent,
+
+			// 1. Fetch all auctions (active + settled)
+			const [activeAuctions, settledAuctions] = await Promise.all([
+				getAllActiveAuctions(stats.auctionCount),
+				getAllSettledAuctions(stats.auctionCount),
+			])
+
+			// 2. Liquidation triggers are simply the combined trigger_agents
+			const triggerAddrs = [
+				...activeAuctions.map(([, a]) => a.trigger_agent),
+				...settledAuctions.map(([, a]) => a.trigger_agent),
+			]
+
+			// 3. Settled auctions for winnings
+			const winData: Record<string, { count: number; totalWinnings: bigint }> =
+				{}
+
+			await Promise.all(
+				settledAuctions.map(async ([id, auction]) => {
+					const winner = auction.declared_winner || auction.trigger_agent
+					let winningAmt = 0n
+					try {
+						const auctionBids = await getAuctionBids(id)
+						const winnerBid = auctionBids.find((b) => b.agent === winner)
+						if (winnerBid) {
+							winningAmt = winnerBid.max_price
+						} else if (auctionBids.length > 0) {
+							const maxBid = [...auctionBids].sort((a, b) =>
+								Number(b.max_price - a.max_price),
+							)[0]
+							winningAmt = maxBid.max_price
+						} else {
+							winningAmt = auction.floor_price // fallback if no bids exist
+						}
+					} catch {}
+
+					if (!winData[winner]) {
+						winData[winner] = { count: 0, totalWinnings: 0n }
+					}
+					winData[winner].count += 1
+					winData[winner].totalWinnings += winningAmt
+				}),
 			)
 
-			// 2. Contract events — auction_started events (covers settled auctions too)
-			const ledger = await getCurrentLedger()
-			const startLedger = Math.max(1, ledger - 5000) // last ~7h of ledgers
-			const events = await getEvents(CONTRACTS.vault, startLedger)
-
-			const winnerAddrs: string[] = []
-
-			for (const ev of events) {
-				const topicStr = String(ev.topic ?? "")
-				const isStarted = topicStr.includes("auction_started")
-				const isSettled = topicStr.includes("auction_settled")
-
-				if (isStarted) {
-					// Try to extract trigger agent from event topics or value
-					const addrFromTopics = extractStellarAddress(ev.topic)
-					const addrFromValue = extractStellarAddress(ev.value)
-					const addr = addrFromTopics ?? addrFromValue
-					if (addr) triggerAddrs.push(addr)
-				}
-
-				if (isSettled) {
-					// Try to extract winning bidder
-					const addrFromTopics = extractStellarAddress(ev.topic)
-					const addrFromValue = extractStellarAddress(ev.value)
-					const addr = addrFromTopics ?? addrFromValue
-					if (addr) winnerAddrs.push(addr)
-				}
-			}
+			const auctionWinsList: LeaderboardEntry[] = Object.entries(winData)
+				.map(([address, data]) => ({
+					address,
+					count: data.count,
+					totalWinnings: data.totalWinnings,
+				}))
+				.sort((a, b) => Number(b.totalWinnings! - a.totalWinnings!))
+				.slice(0, 10)
 
 			setLiquidations(aggregate(triggerAddrs))
-			setAuctionWins(aggregate(winnerAddrs))
+			setAuctionWins(auctionWinsList)
 		} catch {
 			// silently fail — leaderboard is non-critical
 		} finally {
