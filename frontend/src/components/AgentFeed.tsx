@@ -19,9 +19,9 @@ const ENV_VARS = [
 	},
 	{
 		key: "AGENT_ROLE",
-		required: false,
-		default: "both",
-		desc: '"monitor" — scans positions and triggers liquidations (earns trigger fees). "bidder" — bids on auctions (earns discounted collateral). "both" — does everything.',
+		required: true,
+		default: "monitor",
+		desc: '"monitor" — scans positions and triggers liquidations. "bidder" — bids on auctions. Note: For stability, a single agent instance must choose one role. If you want to do both, run two separate agent instances with the same secret key.',
 	},
 	{
 		key: "VAULT_CONTRACT_ID",
@@ -114,7 +114,12 @@ export function AgentFeed() {
 				<h2 className="text-sm font-semibold text-white">Agent Roles</h2>
 				<div className="grid sm:grid-cols-2 gap-4">
 					<div className="rounded-lg border border-gray-700 p-4 space-y-1">
-						<p className="text-sm font-medium text-indigo-300">monitor</p>
+						<div className="flex items-center justify-between">
+							<p className="text-sm font-medium text-indigo-300">monitor</p>
+							<span className="text-[10px] bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 px-1.5 py-0.5 rounded">
+								Exclusive Role
+							</span>
+						</div>
 						<p className="text-xs text-gray-400">
 							Polls positions and generates a ZK health-factor proof for each
 							one. Calls <code className="text-gray-300">trigger_auction</code>{" "}
@@ -123,7 +128,12 @@ export function AgentFeed() {
 						</p>
 					</div>
 					<div className="rounded-lg border border-gray-700 p-4 space-y-1">
-						<p className="text-sm font-medium text-indigo-300">bidder</p>
+						<div className="flex items-center justify-between">
+							<p className="text-sm font-medium text-indigo-300">bidder</p>
+							<span className="text-[10px] bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 px-1.5 py-0.5 rounded">
+								Exclusive Role
+							</span>
+						</div>
 						<p className="text-xs text-gray-400">
 							Watches open auctions. Generates a ZK auction-price proof and
 							submits a limit bid when the Dutch-auction price reaches your
@@ -272,8 +282,9 @@ export ZK_VERIFIER_CONTRACT_ID="${zkVerifierId || "<zk-verifier-id>"}"
 export AGENT_SECRET_KEY="S..."
 export AGENT_OWNER_ADDRESS="G..."
 
-# role: monitor | bidder | both
-export AGENT_ROLE="both"
+# role: monitor | bidder
+# Note: Roles are exclusive. Run two instances to do both.
+export AGENT_ROLE="monitor"
 
 pnpm start`}</pre>
 				<p className="text-xs text-gray-500">
