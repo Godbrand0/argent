@@ -259,11 +259,11 @@ pnpm start:server`}</pre>
 						Calling a paid endpoint
 					</p>
 					<pre className="text-xs text-gray-300 bg-gray-950 rounded-lg p-3 overflow-x-auto">{`# 1. Discover what payment is needed
-curl http://localhost:4000/opportunities
+curl https://argent-1.onrender.com/opportunities
 # → 402 { paymentRequirements: { price: "500000", asset: "USDC:..." } }
 
 # 2. Pay via facilitator, get X-PAYMENT token, retry
-curl http://localhost:4000/opportunities \\
+curl https://argent-1.onrender.com/opportunities \\
   -H "X-PAYMENT: <signed-payment-token>"`}</pre>
 				</div>
 			</div>
