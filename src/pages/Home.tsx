@@ -1,7 +1,6 @@
 import { Button, Card, Icon } from "@stellar/design-system"
 import React from "react"
 import { Link } from "react-router-dom"
-import { GuessTheNumber } from "../components/GuessTheNumber"
 import { labPrefix } from "../contracts/util"
 import styles from "./Home.module.css"
 
@@ -31,22 +30,7 @@ const Home: React.FC = () => (
 				Sample Contracts
 			</h2>
 
-			<p>
-				<strong>Guess The Number:</strong> Interact with the sample contract
-				from the{" "}
-				<Link
-					to="https://scaffoldstellar.org/docs/tutorial/overview"
-					className="Link Link--primary"
-					target="_blank"
-				>
-					Scaffold Tutorial
-				</Link>{" "}
-				using an automatically generated contract client.
-			</p>
-
-			<GuessTheNumber />
-
-			<p>Or take a look at other sample contracts to get you started:</p>
+			<p>Take a look at sample contracts to get you started:</p>
 
 			<nav>
 				<Link to="https://github.com/OpenZeppelin/stellar-contracts/tree/main/examples">
